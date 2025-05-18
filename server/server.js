@@ -12,6 +12,14 @@ const io = require('socket.io')(server, {
   },
 });
 
+// Hashing library for passwords
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+
+// JWT library for authentication
+const jwt = require('jsonwebtoken');
+
+
 // Configure PostgreSQL connection
 const pool = new Pool({
   user: 'admin', // Replace with your PostgreSQL username
