@@ -10,9 +10,10 @@
 
 ### Faza 2: Podstawowa konfiguracja back-endu 🌐
 - [✅] Zainstaluj zależności: Express, Socket.io, pg 📦
-- [ ] Przygotuj bazę danych PostgreSQL dla użytkowników i partii 🗄️
-- [ ] Utwórz serwer Node.js z podstawowym API (rejestracja/logowanie) 🔗
-- [ ] Połącz serwer z PostgreSQL do przechowywania danych użytkowników 🗃️
+- [✅] Przygotuj bazę danych PostgreSQL dla użytkowników 👨‍🎓
+- [ ] Przygotuj bazę danych PostgreSQL dla partii 🗄️
+- [✅] Utwórz serwer Node.js z podstawowym API (rejestracja/logowanie) 🔗
+- [✅] Połącz serwer z PostgreSQL do przechowywania danych użytkowników 🗃️
 - [ ] Wdróż komunikację real-time z Socket.io dla ruchów w grze 📡
 
 ### Faza 3: Podstawowy front-end z Reactem 🎨
