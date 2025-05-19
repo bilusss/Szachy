@@ -1,33 +1,22 @@
 const express = require('express');
 const http = require('http');
-
-const { Pool } = require('pg');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const pool = require('./services/db');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = require('socket.io')(server, {
+const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173', // Allow requests from the client's origin
-    methods: ['GET', 'POST'], // Allow these HTTP methods
+    origin: 'http://localhost:5173', // Dopasuj do portu klienta Vite
+    methods: ['GET', 'POST'],
   },
 });
 
-// Hashing library for passwords
-const bcrypt = require('bcrypt');
-const saltRounds = 10;
-
-// JWT library for authentication
-const jwt = require('jsonwebtoken');
-
-
-// Configure PostgreSQL connection
-const pool = new Pool({
-  user: 'admin', // Replace with your PostgreSQL username
-  host: 'localhost',
-  database: 'szachy', // Replace with your database name
-  password: 'password', // Replace with your PostgreSQL password
-  port: 5432,
-});
+app.use(express.json());
+app.use(cors());
+app.use('/auth', authRoutes);
 
 // Test PostgreSQL connection
 pool.query('SELECT NOW()', (err, res) => {
@@ -45,17 +34,8 @@ app.get('/', (req, res) => {
 
 // Socket.io connection for real-time communication
 io.on('connection', (socket) => {
-  console.log('New user connected:', socket.id);
-
-  socket.on('move', (move) => {
-    console.log('Move received:', move);
-    socket.broadcast.emit('move', move); // Broadcast move to other players
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+  console.log('Nowy użytkownik:', socket.id);
 });
 
-const PORT = process.env.PORT || 5001;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Serwer działa na porcie ${PORT}`));
