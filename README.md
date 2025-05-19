@@ -3,14 +3,14 @@
 ## Roadmapa 🚀
 
 ### Faza 1: Przygotowanie i konfiguracja 🛠️
-- [ ] Zainstaluj Node.js i PostgreSQL na swoim komputerze ⚙️
-- [ ] Sklonuj repozytorium z GitHub 📂
-- [ ] Utwórz strukturę projektu: `client/` (React) i `server/` (Node.js) 🗂️
-- [ ] Skonfiguruj środowisko deweloperskie w VS Code 💻
-- [ ] Przygotuj bazę danych PostgreSQL dla użytkowników i partii 🗄️
+- [✅] Zainstaluj Node.js i PostgreSQL na swoim komputerze ⚙️
+- [✅] Sklonuj repozytorium z GitHub 📂
+- [✅] Utwórz strukturę projektu: `client/` (React) i `server/` (Node.js) 🗂️
+- [✅] Skonfiguruj środowisko deweloperskie w VS Code 💻
 
 ### Faza 2: Podstawowa konfiguracja back-endu 🌐
-- [ ] Zainstaluj zależności: Express, Socket.io, pg 📦
+- [✅] Zainstaluj zależności: Express, Socket.io, pg 📦
+- [ ] Przygotuj bazę danych PostgreSQL dla użytkowników i partii 🗄️
 - [ ] Utwórz serwer Node.js z podstawowym API (rejestracja/logowanie) 🔗
 - [ ] Połącz serwer z PostgreSQL do przechowywania danych użytkowników 🗃️
 - [ ] Wdróż komunikację real-time z Socket.io dla ruchów w grze 📡
