@@ -12,8 +12,8 @@ function Home() {
   };
 
   return (
-    <div>
-      <h2>Strona główna</h2>
+    <div className='flex flex-col items-center justify-center h-screen'>
+      <h2 className=''>Strona główna</h2>
       {isAuthenticated ? (
         <>
           <p>Zalogowano! Token: {user.token}</p>
