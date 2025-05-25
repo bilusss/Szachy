@@ -47,10 +47,11 @@
 
 ## Jak zacząć? 🏁
 1. Sklonuj repozytorium: `git clone <url>`
-2. Zainstaluj zależności w `server/` i `client/` za pomocą `npm install`
-3. Uruchom serwer: `node server.js` (w folderze `server/`)
-4. Uruchom front-end: `npm start` (w folderze `client/`)
-5. Graj i rozwijaj projekt! 🎉
+2. Zainstalować npm, żeby działało z poziomu terminala. (Macos: brew install npm, Windows: najlepiej poradnik)
+3. Zainstaluj zależności w `server/` i `client/` za pomocą `npm install`
+4. Uruchom serwer: `npm start` (w folderze `server/`)
+5. Uruchom front-end: `npm run dev` (w folderze `client/`)
+6. Graj i rozwijaj projekt! 🎉
 
 ### Rozszerzenia VSC
 1. Tailwind CSS IntelliSense
