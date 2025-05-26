@@ -12,7 +12,7 @@ function Home() {
   };
 
   return (
-    <div className='flex flex-col items-center justify-center h-screen'>
+    <div className='flex flex-col items-center justify-center h-screen bg-gray-400'>
       <h2 className=''>Strona główna</h2>
       {isAuthenticated ? (
         <>
