@@ -17,7 +17,7 @@
 - [ ] Wdróż komunikację real-time z Socket.io dla ruchów w grze 📡
 
 ### Faza 3: Podstawowy front-end z Reactem 🎨
-- [ ] Zainstaluj React i Tailwind CSS w folderze `client/` 🖼️
+- [✅] Zainstaluj React i Tailwind CSS w folderze `client/` 🖼️
 - [ ] Stwórz podstawowe komponenty: logowanie, lobby, plansza szachowa 🧩
 - [ ] Połącz Reacta z Socket.io do synchronizacji ruchów ⚡
 - [ ] Zaprojektuj responsywny interfejs z Tailwind CSS 📱
