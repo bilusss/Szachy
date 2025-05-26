@@ -69,3 +69,6 @@
 > password: 'password'  
 > port: 5432
 ```
+
+### Rozszerzenia VSC
+![VSC rozszerzenia](docs/vsc1.png)
