@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import pawn from '../assets/pawn_login.png';
+import pawn from '../assets/pawn.png';
 
 function Home() {
   const { isAuthenticated, user, logout } = useContext(AuthContext);
@@ -24,16 +24,10 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white relative overflow-hidden">
-      {/* Background particle effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="animate-pulse opacity-20 bg-gradient-to-r from-cyan-500 to-purple-500 h-1 w-1 rounded-full absolute top-1/4 left-1/4"></div>
-        <div className="animate-pulse opacity-20 bg-gradient-to-r from-cyan-500 to-purple-500 h-1 w-1 rounded-full absolute bottom-1/4 right-1/4"></div>
-      </div>
-
       {/* Header */}
       <header className="bg-opacity-50 bg-gray-900 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-10">
         <div className="flex items-center space-x-4">
-          <img src={pawn} alt="Chess Pawn" className="w-10 h-10 animate-pulse" />
+          <img src={pawn} alt="Chess Pawn" className="w-10 h-10" />
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
             {isAuthenticated ? `Welcome, ${user?.username}!` : 'ChessVerse'}
           </h1>
@@ -136,20 +130,6 @@ function Home() {
           )}
         </section>
       </main>
-
-      {/* Custom CSS for animations */}
-      <style>
-        {`
-          @keyframes pulse-glow {
-            0% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
-            50% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
-            100% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
-          }
-          .animate-pulse-glow {
-            animation: pulse-glow 2s infinite;
-          }
-        `}
-      </style>
     </div>
   );
 }

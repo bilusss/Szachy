@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+/* uzywane przy login button */
+@keyframes pulse-glow {
+  0% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
+  50% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
+  100% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}

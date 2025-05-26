@@ -2,7 +2,7 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { login } from '../../services/api';
-import pawn from '../../assets/pawn_login.png';
+import pawn from '../../assets/pawn.png';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -24,16 +24,10 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white relative overflow-hidden">
-      {/* Background particle effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="animate-pulse opacity-20 bg-gradient-to-r from-cyan-500 to-purple-500 h-1 w-1 rounded-full absolute top-1/4 left-1/4"></div>
-        <div className="animate-pulse opacity-20 bg-gradient-to-r from-cyan-500 to-purple-500 h-1 w-1 rounded-full absolute bottom-1/4 right-1/4"></div>
-      </div>
-
       {/* Header */}
       <header className="bg-opacity-50 bg-gray-900 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-10">
         <div className="flex items-center space-x-4">
-          <img src={pawn} alt="Chess Pawn" className="w-50 h-50 animate-pulse" />
+          <img src={pawn} alt="Chess Pawn" className="w-10 h-10" />
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
             ChessVerse
           </h1>
@@ -51,9 +45,9 @@ function Login() {
 
       {/* Main Content */}
       <main className="flex items-center justify-center min-h-[calc(100vh-80px)] p-8 relative z-0">
-        <div className="bg-gray-800 bg-opacity-50 backdrop-blur-md p-8 rounded-xl max-w-md w-full shadow-lg border border-cyan-500/30">
+        <div className="bg-gray-800 bg-opacity-50 p-8 rounded-xl max-w-md w-full neon-sky">
           <div className="flex justify-center mb-6">
-            <img src={pawn} alt="Chess Pawn" className="w-50 h-50 animate-pulse" />
+            <img src={pawn} alt="Chess Pawn" className="w-50 h-50" />
           </div>
           <h2 className="text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-6">
             Enter the ChessVerse
@@ -96,20 +90,6 @@ function Login() {
           </p>
         </div>
       </main>
-
-      {/* Custom CSS for animations */}
-      <style>
-        {`
-          @keyframes pulse-glow {
-            0% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
-            50% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
-            100% { border-color: rgba(34, 211, 238, 0.5); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
-          }
-          .animate-pulse-glow {
-            animation: pulse-glow 2s infinite;
-          }
-        `}
-      </style>
     </div>
   );
 }
