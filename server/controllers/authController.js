@@ -36,6 +36,15 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
+  // Walidacja danych
+  if (!username && !password) {
+    return res.status(400).json({ error: 'Nazwa użytkownika i hasło są wymagane' });
+  }else if (!username) {
+    return res.status(400).json({ error: 'Nazwa użytkownika jest wymagana' });
+  }else if (!password) {
+    return res.status(400).json({ error: 'Hasło jest wymagane' });
+  }
+
   try {
     // Znalezienie użytkownika
     const user = await userModel.findByUsername(username);
