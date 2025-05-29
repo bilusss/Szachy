@@ -27,25 +27,7 @@ This guide helps you set up a PostgreSQL database for our chess project on your 
      ```
      - Look for `postgresql@14` with a `started` status.
 
-## Step 2: Initialize the Database Cluster
-1. **Create a Data Directory**:
-   - On Apple Silicon, Homebrew uses `/opt/homebrew/`. Create the PostgreSQL data directory:
-     ```bash
-     sudo mkdir -p /opt/homebrew/var/postgresql@14
-     sudo chown $(whoami):staff /opt/homebrew/var/postgresql@14
-     ```
-
-2. **Initialize the Database**:
-   - Run the initialization command:
-     ```bash
-     initdb /opt/homebrew/var/postgresql@14
-     ```
-   - You should see a success message like:
-     ```
-     Success. You can now start the database server using: ...
-     ```
-
-## Step 3: Create the Database and User
+## Step 2: Create the Database and User
 1. **Connect to PostgreSQL**:
    - Connect using your macOS username:
      ```bash
@@ -68,7 +50,7 @@ This guide helps you set up a PostgreSQL database for our chess project on your 
      \q
      ```
 
-## Step 4: Configure Authentication
+## Step 3: Configure Authentication
 1. **Locate the `pg_hba.conf` File**:
    - Find the file path:
      ```bash
@@ -97,7 +79,7 @@ This guide helps you set up a PostgreSQL database for our chess project on your 
      brew services restart postgresql@14
      ```
 
-## Step 5: Test the Connection
+## Step 4: Test the Connection
 - Test the connection:
   ```bash
   psql -U admin -d szachy
@@ -105,7 +87,7 @@ This guide helps you set up a PostgreSQL database for our chess project on your 
   - Enter the password `password`.
   - If you see `szachy=#`, it worked!
 
-## Step 6: Create Tables
+## Step 5: Create Tables
 - Run the SQL script to create tables:
   ```bash
   psql -U admin -d szachy -f database/init.sql
