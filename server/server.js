@@ -4,38 +4,62 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const pool = require('./services/db');
 const authRoutes = require('./routes/authRoutes');
+const gameRoutes = require('./routes/gameRoutes');
+require('dotenv').config(); // Ładowanie zmiennych środowiskowych z .env
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: 'http://localhost:5173', // Dopasuj do portu klienta Vite
-    methods: ['GET', 'POST'],
-  },
-});
 
+// Konfiguracja CORS
+const corsOptions = {
+  origin: 'http://localhost:5173', // Dopasuj do portu klienta Vite
+  methods: ['GET', 'POST'],
+  credentials: true, // Umożliwienie przesyłania ciasteczek/uwierzytelniania
+};
+app.use(cors(corsOptions));
+
+// Middleware
 app.use(express.json());
-app.use(cors());
-app.use('/auth', authRoutes);
 
-// Test PostgreSQL connection
+// Routing
+app.use('/auth', authRoutes);
+app.use('/games', gameRoutes);
+
+// Test połączenia z PostgreSQL
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
-    console.error('Error connecting to PostgreSQL:', err);
+    console.error('Błąd połączenia z PostgreSQL:', err.stack);
   } else {
-    console.log('Connected to PostgreSQL:', res.rows[0]);
+    console.log('Połączono z PostgreSQL:', res.rows[0]);
   }
 });
 
-// Serve a simple endpoint for testing
+// Prosty endpoint testowy
 app.get('/', (req, res) => {
   res.send('Chess Server is running!');
 });
 
-// Socket.io connection for real-time communication
-io.on('connection', (socket) => {
-  console.log('Nowy użytkownik:', socket.id);
+// Konfiguracja Socket.io
+const io = new Server(server, {
+  cors: corsOptions, // Użycie tej samej konfiguracji CORS co dla Express
 });
 
+io.on('connection', (socket) => {
+  console.log('Nowy użytkownik podłączony:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('Użytkownik rozłączony:', socket.id);
+  });
+});
+
+// Obsługa błędów serwera
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
+});
+
+// Uruchomienie serwera
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serwer działa na porcie ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Serwer działa na porcie ${PORT}`);
+});
