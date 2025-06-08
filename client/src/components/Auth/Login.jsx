@@ -13,7 +13,7 @@ function Login() {
   const navigate = useNavigate();
   const { login: loginContext } = useContext(AuthContext);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const animRef = useRef(null); // Ref do przechowywania instancji animacji
+  const animRef = useRef(null);
 
   useEffect(() => {
     // Inicjalizacja animacji Lottie
@@ -33,21 +33,23 @@ function Login() {
     };
   }, []);
 
+// W komponencie Login zmień handleSubmit na:
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await login(username, password);
-      loginContext(response.token);
-      navigate('/');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Login Failed');
-    }
+  e.preventDefault();
+  try {
+    const response = await login(username, password);
+    // Przekaż zarówno token jak i dane użytkownika
+    loginContext(response.token, { username: response.username });
+    navigate('/lobby'); // lub gdzie chcesz przekierować po logowaniu
+  } catch (err) {
+    setError(err.response?.data?.error || 'Login Failed');
+  }
   };
 
   const toggleMenu = () => {
     if (animRef.current) {
-      // Użycie istniejącej instancji animacji
-      animRef.current.setDirection(isMenuOpen ? -1 : 1); // Odwrotna animacja przy zamykaniu
+      animRef.current.setDirection(isMenuOpen ? -1 : 1);
       animRef.current.play();
     }
     setIsMenuOpen(!isMenuOpen);
@@ -111,6 +113,7 @@ function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
                 className="w-full p-3 bg-gray-900 bg-opacity-70 border border-cyan-500/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-300"
+                required
               />
             </div>
             <div>
@@ -120,6 +123,7 @@ function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full p-3 bg-gray-900 bg-opacity-70 border border-cyan-500/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-300"
+                required
               />
             </div>
             <button
@@ -131,7 +135,7 @@ function Login() {
             </button>
           </form>
           <p className="text-center mt-4 text-gray-400">
-            Don’t have an account?{' '}
+            Don't have an account?{' '}
             <button onClick={handleRegister} className="text-cyan-400 hover:text-cyan-300">
               Register
             </button>
