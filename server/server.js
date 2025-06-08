@@ -16,8 +16,8 @@ const corsOptions = {
   methods: ['GET', 'POST'],
   credentials: true, // Umożliwienie przesyłania ciasteczek/uwierzytelniania
 };
-app.use(cors(corsOptions));
 
+app.use(cors(corsOptions));
 // Middleware
 app.use(express.json());
 
@@ -47,9 +47,22 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('Nowy użytkownik podłączony:', socket.id);
 
-  socket.on('disconnect', () => {
-    console.log('Użytkownik rozłączony:', socket.id);
+  socket.on('joinGame', (gameId) => {
+    socket.join(gameId);
+    const game = activeGames.get(gameId);
+    if (game) {
+      io.to(gameId).emit('gameState', { fen: game.fen, currentTurn: game.currentTurn, status: game.status });
+    }
   });
+
+  socket.on('move', ({ gameId, from, to, playerId }) => {
+    const { valid, updatedFen } = validateMove(gameId, from, to, playerId);
+    if (valid) {
+      io.to(gameId).emit('gameState', { fen: updatedFen, currentTurn: activeGames.get(gameId).currentTurn, status: activeGames.get(gameId).status });
+    }
+  });
+
+  socket.on('disconnect', () => console.log('Użytkownik rozłączony:', socket.id));
 });
 
 // Obsługa błędów serwera
