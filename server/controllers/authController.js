@@ -85,6 +85,8 @@ exports.verifyToken = async (req, res) => {
     }
 
     const user = result.rows[0];
+    console.log(user)
+    console.log(result)
     res.json({ username: user.username });
   } catch (err) {
     console.error('Błąd weryfikacji tokena:', err.message);
