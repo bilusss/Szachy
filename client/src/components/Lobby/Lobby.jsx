@@ -27,8 +27,8 @@ function Lobby() {
 
   const handleCreateGame = () => {
     // Placeholder: później wyślemy żądanie do backendu
-    alert('Game created! (Placeholder)');
-    navigate('/game/1'); // Przekierowanie do przykładowej gry
+    // alert('Game created! (Placeholder)');
+    navigate('/game/create'); // Przekierowanie do przykładowej gry
   };
 
   const handleLogout = () => {

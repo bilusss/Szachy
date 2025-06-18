@@ -23,7 +23,7 @@ app.use(express.json());
 
 // Routing
 app.use('/auth', authRoutes);
-app.use('/games', gameRoutes);
+app.use('/game', gameRoutes);
 
 // Test połączenia z PostgreSQL
 pool.query('SELECT NOW()', (err, res) => {
