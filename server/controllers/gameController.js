@@ -2,16 +2,30 @@ const { pool } = require('../services/db');
 
 let activeGames = new Map(); // Mapa przechowująca stany gier (gameId -> gameState)
 
-const initializeGame = (gameId, whitePlayerId, blackPlayerId) => {
-  const initialFen = 'rnbqkbnr/pppp1ppp/5n2/5p2/5P2/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2';
-  activeGames.set(gameId, {
+const initializeGame = async (gameId, whitePlayerId, blackPlayerId) => {
+  const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const gameState = {
     fen: initialFen,
     currentTurn: 'w',
     whitePlayerId,
     blackPlayerId,
     moveHistory: [],
-    status: 'ongoing',
-  });
+    status: blackPlayerId === 'bot' ? 'ongoing' : 'waiting',
+  };
+  activeGames.set(gameId, gameState);
+
+  try {
+    await pool.query(
+      `INSERT INTO games (id, white_player_id, black_player_id, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+      [gameId, whitePlayerId, blackPlayerId === 'bot' ? null : blackPlayerId, gameState.status]
+    );
+  } catch (error) {
+    console.error('Error saving game to database:', error);
+    throw error;
+  }
+
+  return gameState;
 };
 
 const validateMove = (gameId, from, to, playerId) => {
@@ -32,10 +46,23 @@ const validateMove = (gameId, from, to, playerId) => {
 };
 
 exports.createGame = async (req, res) => {
-  const { userId } = req.body;
+  const { playerId, gameType } = req.body;
+  if (!playerId || !gameType) {
+    return res.status(400).json({ error: 'playerId and gameType are required' });
+  }
   const gameId = Date.now().toString();
-  initializeGame(gameId, userId, null);
-  res.status(201).json({ gameId });
+  try {
+    const blackPlayerId = gameType === 'bot' ? 'bot' : null;
+    const gameState = await initializeGame(gameId, playerId, blackPlayerId);
+    res.status(201).json({
+      gameId,
+      fen: gameState.fen,
+      currentTurn: gameState.currentTurn,
+      status: gameState.status,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create game' });
+  }
 };
 
 exports.joinGame = async (req, res) => {

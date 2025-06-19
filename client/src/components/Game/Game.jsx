@@ -7,37 +7,37 @@ import { joinGame, makeMove } from '../../services/api';
 function Game() {
   const { gameId } = useParams();
   const [gameState, setGameState] = useState({
-    fen: 'rnbqkbnr/pppp1ppp/5n2/5p2/5P2/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2',
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', // Clean initial board
     currentTurn: 'w',
     status: 'ongoing',
   });
   const [computerLevel, setComputerLevel] = useState('Easy 🤓');
   const chessboardRef = useRef(null);
-  const containerRef = useRef(null); // Nowy ref dla kontenera
+  const containerRef = useRef(null);
   const [currentTimeout, setCurrentTimeout] = useState(null);
-  const [boardWidth, setBoardWidth] = useState(calculateBoardWidth()); // Inicjalna szerokość
+  const [boardWidth, setBoardWidth] = useState(calculateBoardWidth());
 
-  // Funkcja obliczająca szerokość szachownicy
+  // Calculate chessboard width
   function calculateBoardWidth() {
-    if (!containerRef.current) return 300; // Domyślna wartość przy pierwszym renderze
+    if (!containerRef.current) return 300;
     const containerWidth = containerRef.current.getBoundingClientRect().width;
-    const padding = 64; // Padding wewnątrz kontenera (1rem = 16px)
-    const maxWidth = 600; // Maksymalna szerokość szachownicy
-    const minWidth = 280; // Minimalna szerokość szachownicy
+    const padding = 64;
+    const maxWidth = 600;
+    const minWidth = 280;
     return Math.min(Math.max(containerWidth - padding, minWidth), maxWidth);
   }
 
-  // Aktualizacja szerokości przy zmianie rozmiaru okna
+  // Update width on window resize
   useEffect(() => {
     const handleResize = () => {
       setBoardWidth(calculateBoardWidth());
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Wywołaj od razu po zamontowaniu
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Funkcja bezpiecznej mutacji gry
+  // Safe state mutation
   const safeGameMutate = (modify) => {
     setGameState((prev) => {
       const update = { ...prev };
@@ -46,7 +46,7 @@ function Game() {
     });
   };
 
-  // Losowy ruch komputera
+  // Computer move
   const makeComputerMove = useCallback(() => {
     const game = { fen: gameState.fen, moves: () => ['e2e4', 'd2d4'] };
     const possibleMoves = game.moves ? game.moves() : ['e2e4', 'd2d4'];
@@ -66,14 +66,17 @@ function Game() {
     }
   }, [gameId, gameState.fen, gameState.currentTurn, gameState.status]);
 
+  // Join game and handle bot moves
   useEffect(() => {
-    joinGame(gameId, (state) => {
-      safeGameMutate((gameState) => {
-        gameState.fen = state.fen || 'rnbqkbnr/pppp1ppp/5n2/5p2/5P2/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2';
-        gameState.currentTurn = state.currentTurn || 'w';
-        gameState.status = state.status || 'ongoing';
+    if (gameId) {
+      joinGame(gameId, (state) => {
+        safeGameMutate((gameState) => {
+          gameState.fen = state.fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+          gameState.currentTurn = state.currentTurn || 'w';
+          gameState.status = state.currentTurn ? state.status : 'waiting';
+        });
       });
-    });
+    }
 
     if (gameState.currentTurn === 'b' && gameState.status === 'ongoing') {
       const timeout = setTimeout(makeComputerMove, 1000);
@@ -83,6 +86,7 @@ function Game() {
     return () => clearTimeout(currentTimeout);
   }, [gameId, gameState.currentTurn, gameState.status, makeComputerMove, currentTimeout]);
 
+  // Handle piece drop
   const onDrop = useCallback(
     (sourceSquare, targetSquare, piece) => {
       if (gameState.currentTurn !== 'w') return false;
@@ -92,7 +96,7 @@ function Game() {
         to: targetSquare,
         promotion: piece[1]?.toLowerCase() ?? 'q',
       };
-      const playerId = 'userId'; // TODO: Pobierz z AuthContext
+      const playerId = 'userId'; // TODO: Replace with AuthContext
       makeMove(gameId, move.from, move.to, playerId, (state) => {
         safeGameMutate((gameState) => {
           gameState.fen = state.fen;
@@ -110,9 +114,10 @@ function Game() {
     [gameId, gameState.currentTurn, gameState.status, makeComputerMove]
   );
 
+  // Reset game
   const resetGame = () => {
     safeGameMutate((gameState) => {
-      gameState.fen = 'rnbqkbnr/pppp1ppp/5n2/5p2/5P2/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2';
+      gameState.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       gameState.currentTurn = 'w';
       gameState.status = 'ongoing';
     });
@@ -123,9 +128,10 @@ function Game() {
     });
   };
 
+  // Undo move
   const undoMove = () => {
     safeGameMutate((gameState) => {
-      gameState.fen = 'rnbqkbnr/pppp1ppp/5n2/5p2/5P2/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 2';
+      gameState.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       gameState.currentTurn = 'w';
       gameState.status = 'ongoing';
     });

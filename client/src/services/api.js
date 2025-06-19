@@ -3,13 +3,13 @@ import { io } from 'socket.io-client';
 
 const api = axios.create({
   baseURL: 'http://localhost:3000',
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Dodany interceptor do automatycznego dodawania tokena do headerów
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`; // Dodano 'Bearer' dla zgodności z WebSocket
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -24,16 +24,16 @@ export const register = async (username, password) => {
   return response.data;
 };
 
-// Dodaj funkcję weryfikacji tokena
 export const verifyToken = async () => {
   const response = await api.get('/auth/verify');
   return response.data;
 };
 
-// Inicjalizacja WebSocket
-const socket = io('http://localhost:3000', { withCredentials: true });
+export const createGame = async (data) => {
+  const response = await api.post('/game/create', data);
+  return response.data;
+};
 
-// Funkcje WebSocket dla gry
 export const joinGame = (gameId, callback) => {
   socket.emit('joinGame', gameId);
   socket.on('gameState', callback);
@@ -43,5 +43,7 @@ export const makeMove = (gameId, from, to, playerId, callback) => {
   socket.emit('move', { gameId, from, to, playerId });
   socket.on('gameState', callback);
 };
+
+const socket = io('http://localhost:3000', { withCredentials: true });
 
 export default socket;
