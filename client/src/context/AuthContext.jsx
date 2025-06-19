@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
   const checkTokenValidity = async () => {
     try {
       const data = await apiVerifyToken();
-      return data.username;
+      return data;
     } catch (error) {
       console.error('Błąd weryfikacji tokena:', error);
       return null;
@@ -23,13 +23,20 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       const storedUsername = localStorage.getItem('username');
+      const storedUserId = localStorage.getItem('userId');
       
       if (token) {
-        const username = await checkTokenValidity();
+        const data = await checkTokenValidity();
+        console.log(data);
+        const username = data.username;
+        const userId = data.userId;
         if (username) {
           // Zapisz username w localStorage jeśli jeszcze nie istnieje lub się różni
           if (!storedUsername || storedUsername !== username) {
             localStorage.setItem('username', username);
+          }
+          if (!storedUserId || storedUserId !== userId) {
+            localStorage.setItem('userId', userId);
           }
           setUser({ username });
           setIsAuthenticated(true);
@@ -37,12 +44,14 @@ export function AuthProvider({ children }) {
           // Token nieprawidłowy - wyczyść localStorage
           localStorage.removeItem('token');
           localStorage.removeItem('username');
+          localStorage.removeItem('userId');
           setIsAuthenticated(false);
           setUser(null);
         }
       } else {
         // Brak tokena - wyczyść wszystko
         localStorage.removeItem('username');
+        localStorage.removeItem('userId');
         setIsAuthenticated(false);
         setUser(null);
       }
@@ -54,8 +63,10 @@ export function AuthProvider({ children }) {
 
   // Login
   const login = (token, userData) => {
+    console.log(userData);
     localStorage.setItem('token', token);
     if (userData && userData.username) {
+      localStorage.setItem('userId', userData.userId);
       localStorage.setItem('username', userData.username);
       setUser(userData);
     }
@@ -66,6 +77,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('userId');
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -74,9 +86,12 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     const token = localStorage.getItem('token');
     if (token) {
-      const username = await checkTokenValidity();
-      if (username) {
+      const data = await checkTokenValidity();
+      const username = data.username;
+      const userId = data.userId;
+      if (username && userId) {
         localStorage.setItem('username', username);
+        localStorage.setItem('userID', userId);
         setUser({ username });
         setIsAuthenticated(true);
         return true;

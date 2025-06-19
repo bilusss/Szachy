@@ -57,7 +57,7 @@ exports.login = async (req, res) => {
 
     // Generowanie tokenu JWT
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, username: user.username });
+    res.json({ token, username: user.username, userId: user.id });
   } catch (error) {
     console.error('Błąd logowania:', error);
     res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
@@ -85,9 +85,7 @@ exports.verifyToken = async (req, res) => {
     }
 
     const user = result.rows[0];
-    console.log(user)
-    console.log(result)
-    res.json({ username: user.username });
+    res.json({userId: user.id ,username: user.username });
   } catch (err) {
     console.error('Błąd weryfikacji tokena:', err.message);
     res.status(401).json({ error: 'Nieprawidłowy token' });

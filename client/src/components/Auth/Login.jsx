@@ -40,7 +40,7 @@ function Login() {
   try {
     const response = await login(username, password);
     // Przekaż zarówno token jak i dane użytkownika
-    loginContext(response.token, { username: response.username });
+    loginContext(response.token, {username: response.username, userId: response.userId });
     navigate('/lobby'); // lub gdzie chcesz przekierować po logowaniu
   } catch (err) {
     setError(err.response?.data?.error || 'Login Failed');
