@@ -5,7 +5,7 @@ export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState({username: null, userId: null});
   const [loading, setLoading] = useState(true);
 
   // Funkcja weryfikacji tokena używająca api.js
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
           if (!storedUserId || storedUserId !== userId) {
             localStorage.setItem('userId', userId);
           }
-          setUser({ username });
+          setUser({ username: username, userId:userId });
           setIsAuthenticated(true);
         } else {
           // Token nieprawidłowy - wyczyść localStorage
@@ -46,14 +46,14 @@ export function AuthProvider({ children }) {
           localStorage.removeItem('username');
           localStorage.removeItem('userId');
           setIsAuthenticated(false);
-          setUser(null);
+          setUser({username: null, userId: null});
         }
       } else {
         // Brak tokena - wyczyść wszystko
         localStorage.removeItem('username');
         localStorage.removeItem('userId');
         setIsAuthenticated(false);
-        setUser(null);
+        setUser({username: null, userId: null});
       }
       setLoading(false);
     };
@@ -64,11 +64,13 @@ export function AuthProvider({ children }) {
   // Login
   const login = (token, userData) => {
     console.log(userData);
+    const username = userData.username;
+    const userId = userData.userId;
     localStorage.setItem('token', token);
     if (userData && userData.username) {
-      localStorage.setItem('userId', userData.userId);
-      localStorage.setItem('username', userData.username);
-      setUser(userData);
+      localStorage.setItem('userId', userId);
+      localStorage.setItem('username', username);
+      setUser({username: username, userId: userId});
     }
     setIsAuthenticated(true);
   };
@@ -78,7 +80,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
-    setUser(null);
+    setUser({username: null, userId: null});
     setIsAuthenticated(false);
   };
 
@@ -91,8 +93,8 @@ export function AuthProvider({ children }) {
       const userId = data.userId;
       if (username && userId) {
         localStorage.setItem('username', username);
-        localStorage.setItem('userID', userId);
-        setUser({ username });
+        localStorage.setItem('userId', userId);
+        setUser({ username: username, userId: userId });
         setIsAuthenticated(true);
         return true;
       } else {

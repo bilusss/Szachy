@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useContext} from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../context/AuthContext';
 import { createGame } from '../../services/api';
 import king from '../../assets/king.svg';
 
@@ -7,12 +8,13 @@ function GameCreate() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { user } = useContext(AuthContext);
 
   const handleCreateGame = async (gameType) => {
     setIsLoading(true);
     setError(null);
     try {
-      const playerId = 'userId'; // TODO: Replace with AuthContext userId
+      const playerId = user.userId;
       const response = await createGame({ gameType, playerId });
       navigate(`/game/${response.gameId}`);
     } catch (err) {
