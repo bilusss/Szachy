@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS games (
   id SERIAL PRIMARY KEY,
   white_player_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   black_player_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- NULL dla bota
+  fen TEXT NOT NULL, -- Dodano kolumnę fen
   status TEXT NOT NULL DEFAULT 'waiting', -- waiting, ongoing, finished
   result TEXT, -- checkmate, draw, resigned, timeout
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS games (
 -- Tworzenie tabeli ruchów
 CREATE TABLE IF NOT EXISTS moves (
   id SERIAL PRIMARY KEY,
-  game_id SERIAL REFERENCES games(id) ON DELETE CASCADE,
+  game_id INTEGER REFERENCES games(id) ON DELETE CASCADE,
   player_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- NULL dla bota
   from_square VARCHAR(2) NOT NULL, -- np. 'e2'
   to_square VARCHAR(2) NOT NULL, -- np. 'e4'

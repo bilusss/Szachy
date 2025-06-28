@@ -1,33 +1,38 @@
-const { pool } = require('../services/db');
+const pool = require('../services/db');
 
 let activeGames = new Map(); // Mapa przechowująca stany gier (gameId -> gameState)
 
-const initializeGame = async (gameId, whitePlayerId, blackPlayerId) => {
+const initializeGame = async (whitePlayerId, blackPlayerId) => {
   const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const status = blackPlayerId === 'bot' ? 'ongoing' : 'waiting';
   const gameState = {
     fen: initialFen,
     currentTurn: 'w',
     whitePlayerId,
     blackPlayerId,
     moveHistory: [],
-    status: blackPlayerId === 'bot' ? 'ongoing' : 'waiting',
+    status,
   };
-  activeGames.set(gameId, gameState);
 
   try {
-    await pool.query(
-      `INSERT INTO games (id, white_player_id, black_player_id, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-      [gameId, whitePlayerId, blackPlayerId === 'bot' ? null : blackPlayerId, gameState.status]
+    await pool.query('SELECT NOW()'); // Test DB connection
+    console.log('Initializing game with:', { whitePlayerId, blackPlayerId, status });
+    const result = await pool.query(
+      `INSERT INTO games (white_player_id, black_player_id, fen, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())
+       RETURNING id`,
+      [whitePlayerId, blackPlayerId === 'bot' ? null : blackPlayerId, initialFen, status]
     );
+    const gameId = result.rows[0].id; // Get DB-generated ID
+    gameState.gameId = gameId; // Add gameId to gameState
+    activeGames.set(gameId, gameState); // Store in activeGames
+    return gameState;
   } catch (error) {
-    console.error('Error saving game to database:', error);
+    console.error('Error saving game to database:', error.stack);
     throw error;
   }
-
-  return gameState;
 };
-
+    
 const validateMove = (gameId, from, to, playerId) => {
   const game = activeGames.get(gameId);
   if (!game) return { valid: true, fen: game?.fen || 'start', currentTurn: 'w', status: 'ongoing' }; // Brak gry
@@ -50,17 +55,18 @@ exports.createGame = async (req, res) => {
   if (!playerId || !gameType) {
     return res.status(400).json({ error: 'playerId and gameType are required' });
   }
-  const gameId = Date.now().toString();
+
   try {
-    const blackPlayerId = gameType === 'bot' ? 'bot' : null;
-    const gameState = await initializeGame(gameId, playerId, blackPlayerId);
+    // Pass playerId and gameType to initializeGame, let DB generate gameId
+    const gameState = await initializeGame(playerId, gameType === 'bot' ? 'bot' : null);
     res.status(201).json({
-      gameId,
+      gameId: gameState.gameId, // Use DB-generated gameId
       fen: gameState.fen,
       currentTurn: gameState.currentTurn,
       status: gameState.status,
     });
   } catch (error) {
+    console.error('Error in createGame:', error);
     res.status(500).json({ error: 'Failed to create game' });
   }
 };
