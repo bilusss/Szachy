@@ -83,8 +83,10 @@ function Game() {
       setCurrentTimeout(timeout);
     }
 
-    return () => clearTimeout(currentTimeout);
-  }, [gameId, gameState.currentTurn, gameState.status, makeComputerMove, currentTimeout]);
+    return () => {
+    if (currentTimeout) clearTimeout(currentTimeout);
+  };
+  }, [gameId, gameState.currentTurn, gameState.status, makeComputerMove]);
 
   // Handle piece drop
   const onDrop = useCallback(
