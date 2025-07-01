@@ -99,11 +99,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('move', async ({ gameId, from, to, playerId }) => {
+  socket.on('move', async ({ gameId, from, to, playerId, promotion }) => {
     try {
       console.log(`Ruch w grze ${gameId}: ${from} -> ${to} przez ${playerId}`);
       
-      const { valid, fen, currentTurn, status, error } = await validateMove(gameId, from, to, playerId);
+      const { valid, fen, currentTurn, status, isCheck, isCheckmate, isStalemate, error } = 
+        await validateMove(gameId, from, to, playerId, promotion);
       
       if (valid) {
         const gameState = {

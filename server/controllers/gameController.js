@@ -1,4 +1,5 @@
 const pool = require('../services/db');
+const { isLegalMove, makeMove, getGameStatus } = require('../services/chessLogic');
 
 let activeGames = new Map(); // Mapa przechowująca stany gier (gameId -> gameState)
 
@@ -42,7 +43,7 @@ const loadActiveGamesFromDB = async () => {
 const loadMoveHistoryFromDB = async (gameId) => {
   try {
     const result = await pool.query(`
-      SELECT from_square, to_square, player_id, move_number, fen, created_at
+      SELECT from_square, to_square, player_id, move_number, fen, promotion, created_at
       FROM moves 
       WHERE game_id = $1 
       ORDER BY move_number ASC
@@ -54,6 +55,7 @@ const loadMoveHistoryFromDB = async (gameId) => {
       playerId: row.player_id,
       moveNumber: row.move_number,
       fen: row.fen,
+      promotion: row.promotion,
       timestamp: row.created_at
     }));
   } catch (error) {
@@ -63,12 +65,12 @@ const loadMoveHistoryFromDB = async (gameId) => {
 };
 
 // Funkcja do zapisania ruchu w bazie danych
-const saveMoveToDB = async (gameId, from, to, playerId, moveNumber, newFen) => {
+const saveMoveToDB = async (gameId, from, to, playerId, moveNumber, newFen, promotion = null) => {
   try {
     await pool.query(`
-      INSERT INTO moves (game_id, player_id, from_square, to_square, move_number, fen, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-    `, [gameId, playerId === 'bot' ? null : playerId, from, to, moveNumber, newFen]);
+      INSERT INTO moves (game_id, player_id, from_square, to_square, move_number, fen, promotion, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `, [gameId, playerId === 'bot' ? null : playerId, from, to, moveNumber, newFen, promotion]);
     
     console.log(`Ruch zapisany w DB: gra ${gameId}, ruch ${moveNumber}`);
   } catch (error) {
@@ -177,43 +179,96 @@ const getGame = async (gameId) => {
   return game;
 };
 
-const validateMove = async (gameId, from, to, playerId) => {
+const validateMove = async (gameId, from, to, playerId, promotion = null) => {
   const game = await getGame(gameId);
   if (!game) {
     return { valid: false, error: 'Gra nie znaleziona' };
   }
 
-  // Zapis ruchu bez walidacji (możesz dodać walidację później)
+  // Sprawdź czy gra jest w odpowiednim statusie
+  if (game.status !== 'ongoing') {
+    return { valid: false, error: 'Gra nie jest aktywna' };
+  }
+
+  // Sprawdź czy to kolejka gracza
+  const currentPlayerColor = game.currentTurn;
+  const isWhitePlayer = playerId === game.whitePlayerId || (playerId === 'bot' && game.whitePlayerId === null);
+  const isBlackPlayer = playerId === game.blackPlayerId || (playerId === 'bot' && game.blackPlayerId === null);
+  
+  if (currentPlayerColor === 'w' && !isWhitePlayer) {
+    return { valid: false, error: 'To nie Twoja kolejka' };
+  }
+  if (currentPlayerColor === 'b' && !isBlackPlayer) {
+    return { valid: false, error: 'To nie Twoja kolejka' };
+  }
+
+  // Wykonanie ruchu lub reset
   if (from && to) {
-    const moveNumber = game.moveHistory.length + 1;
-    const moveData = { 
-      from, 
-      to, 
-      playerId, 
-      moveNumber,
-      timestamp: new Date() 
-    };
-    
-    // Dodaj ruch do pamięci
-    game.moveHistory.push(moveData);
-    game.currentTurn = game.currentTurn === 'w' ? 'b' : 'w';
-    
-    // Możesz tutaj dodać logikę aktualizacji FEN na podstawie ruchu
-    // Na razie pozostawiam oryginalny FEN, ale powinieneś to zaktualizować
-    const newFen = game.fen; // TODO: Wygeneruj nowy FEN na podstawie ruchu
-    
     try {
-      // Zapisz ruch w bazie danych
-      await saveMoveToDB(gameId, from, to, playerId, moveNumber, newFen);
+      // Walidacja ruchu za pomocą chessLogic
+      console.log("test1:", game.fen, from, to);
+      if (!isLegalMove(game.fen, from, to)) {
+        return { valid: false, error: 'Nieprawidłowy ruch' };
+      }
+      console.log("test2:");
+      // Wykonaj ruch i otrzymaj nowy stan gry
+      const moveResult = makeMove(game.fen, from, to, promotion);
+      const newFen = moveResult.newFen;
       
-      // Aktualizuj grę w bazie danych
-      await updateGameInDB(gameId, game);
+      // Sprawdź status gry
+      const gameStatus = getGameStatus(newFen);
+      
+      const moveNumber = game.moveHistory.length + 1;
+      const moveData = { 
+        from, 
+        to, 
+        playerId, 
+        moveNumber,
+        promotion,
+        fen: newFen,
+        timestamp: new Date() 
+      };
+      
+      // Dodaj ruch do pamięci
+      game.moveHistory.push(moveData);
+      game.fen = newFen;
+      game.currentTurn = newFen.split(' ')[1]; // Aktualizuj turę z FEN
+      
+      // Aktualizuj status gry jeśli się zmienił
+      if (gameStatus !== 'ongoing') {
+        game.status = gameStatus;
+      }
+      
+      try {
+        // Zapisz ruch w bazie danych
+        await saveMoveToDB(gameId, from, to, playerId, moveNumber, newFen, promotion);
+        
+        // Aktualizuj grę w bazie danych
+        await updateGameInDB(gameId, game);
+        
+      } catch (error) {
+        // Jeśli nie udało się zapisać w DB, cofnij zmiany w pamięci
+        game.moveHistory.pop();
+        game.fen = game.moveHistory.length > 0 ? 
+          game.moveHistory[game.moveHistory.length - 1].fen : 
+          'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        game.currentTurn = game.fen.split(' ')[1];
+        throw error;
+      }
+      
+      return { 
+        valid: true, 
+        fen: game.fen, 
+        currentTurn: game.currentTurn, 
+        status: game.status,
+        isCheck: moveResult.isCheck,
+        isCheckmate: moveResult.isCheckmate,
+        isStalemate: moveResult.isStalemate
+      };
       
     } catch (error) {
-      // Jeśli nie udało się zapisać w DB, cofnij zmiany w pamięci
-      game.moveHistory.pop();
-      game.currentTurn = game.currentTurn === 'w' ? 'b' : 'w';
-      throw error;
+      console.error('Błąd podczas wykonywania ruchu:', error);
+      return { valid: false, error: error.message || 'Błąd wykonania ruchu' };
     }
     
   } else if (!from && !to) {
@@ -226,22 +281,25 @@ const validateMove = async (gameId, from, to, playerId) => {
       game.moveHistory = [];
       game.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       game.currentTurn = 'w';
+      game.status = 'ongoing';
       
       // Aktualizuj grę w bazie danych
       await updateGameInDB(gameId, game);
       
+      return { 
+        valid: true, 
+        fen: game.fen, 
+        currentTurn: game.currentTurn, 
+        status: game.status 
+      };
+      
     } catch (error) {
       console.error('Błąd podczas resetowania gry:', error);
-      throw error;
+      return { valid: false, error: 'Błąd resetowania gry' };
     }
   }
   
-  return { 
-    valid: true, 
-    fen: game.fen, 
-    currentTurn: game.currentTurn, 
-    status: game.status 
-  };
+  return { valid: false, error: 'Nieprawidłowe parametry ruchu' };
 };
 
 // Kontrolery API
@@ -301,14 +359,22 @@ exports.joinGame = async (req, res) => {
 
 exports.makeMove = async (req, res) => {
   const { gameId } = req.params;
-  const { from, to, playerId } = req.body;
+  const { from, to, playerId, promotion } = req.body;
+  
   try {
-    const { valid, fen, currentTurn, status, error } = await validateMove(gameId, from, to, playerId);
+    const result = await validateMove(gameId, from, to, playerId, promotion);
     
-    if (valid) {
-      res.json({ fen, currentTurn, status });
+    if (result.valid) {
+      res.json({ 
+        fen: result.fen, 
+        currentTurn: result.currentTurn, 
+        status: result.status,
+        isCheck: result.isCheck,
+        isCheckmate: result.isCheckmate,
+        isStalemate: result.isStalemate
+      });
     } else {
-      res.status(400).json({ error: error || 'Nieprawidłowy ruch' });
+      res.status(400).json({ error: result.error || 'Nieprawidłowy ruch' });
     }
   } catch (error) {
     console.error('Błąd w makeMove:', error);

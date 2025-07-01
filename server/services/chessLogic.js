@@ -15,6 +15,7 @@ const { parseFen, getLegalMoves, applyMove } = require('./chessBoard');
  * @throws {Error} If FEN is invalid or coordinates are malformed
  */
 function isLegalMove(fen, from, to) {
+    console.log("FEN received in isLegalMove:", fen, typeof fen);
     if (!fen || typeof fen !== 'string') {
         throw new Error('Invalid FEN: FEN must be a non-empty string');
     }
