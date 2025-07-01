@@ -27,7 +27,6 @@ export function AuthProvider({ children }) {
       
       if (token) {
         const data = await checkTokenValidity();
-        console.log(data);
         const username = data.username;
         const userId = data.userId;
         if (username) {
@@ -63,7 +62,6 @@ export function AuthProvider({ children }) {
 
   // Login
   const login = (token, userData) => {
-    console.log(userData);
     const username = userData.username;
     const userId = userData.userId;
     localStorage.setItem('token', token);

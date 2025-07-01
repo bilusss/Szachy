@@ -39,8 +39,9 @@ export const joinGame = (gameId, callback) => {
   socket.on('gameState', callback);
 };
 
-export const makeMove = (gameId, from, to, playerId, callback) => {
-  socket.emit('move', { gameId, from, to, playerId });
+export const makeMove = (gameId, from, to, playerId, callback, promotion) => {
+  console.log(gameId, from, to, playerId, callback);
+  socket.emit('move', { gameId, from, to, playerId, promotion });
   socket.on('gameState', callback);
 };
 

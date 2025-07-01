@@ -76,14 +76,12 @@ const io = new Server(server, {
 });
 
 io.on('connection', (socket) => {
-  console.log('Nowy użytkownik podłączony:', socket.id);
-
   socket.on('joinGame', async (gameId) => {
     try {
       socket.join(gameId.toString());
       const activeGames = getActiveGames();
       const game = activeGames.get(parseInt(gameId));
-      
+      // console.log("connection - join - game: ", game);
       if (game) {
         console.log(`Użytkownik ${socket.id} dołączył do gry ${gameId}`);
         io.to(gameId.toString()).emit('gameState', {
