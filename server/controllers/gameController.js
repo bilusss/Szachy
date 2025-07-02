@@ -1,30 +1,23 @@
 const pool = require('../services/db');
 const { isLegalMove, makeMove, getGameStatus } = require('../services/chessLogic');
+const { parseFen, getLegalMoves, applyMove, boardToFen } = require('../services/chessBoard');
 
-// Import funkcji z chess services - spróbuj różnych sposobów importu
 let chessBoard, chessLogic;
 
 try {
   chessBoard = require('../services/chessBoard');
   chessLogic = require('../services/chessLogic');
 } catch (error) {
-  console.error('Błąd importu chess services:', error);
+  console.error('Import error chess services:', error);
 }
 
-// Sprawdź dostępne funkcje i użyj odpowiedniej metody dostępu
-const parseFen = chessBoard?.parseFen || chessBoard?.default?.parseFen;
-const boardToFen = chessBoard?.boardToFen || chessBoard?.default?.boardToFen;
-const applyMove = chessBoard?.applyMove || chessBoard?.default?.applyMove;
-const getLegalMoves = chessBoard?.getLegalMoves || chessBoard?.default?.getLegalMoves;
 const isSquareAttacked = chessBoard?.isSquareAttacked || chessBoard?.default?.isSquareAttacked;
 const findKing = chessBoard?.findKing || chessBoard?.default?.findKing;
-
 const isValidSquare = chessLogic?.isValidSquare || chessLogic?.default?.isValidSquare;
 const isInCheck = chessLogic?.isInCheck || chessLogic?.default?.isInCheck;
 
-let activeGames = new Map(); // Mapa przechowująca stany gier (gameId -> gameState)
+let activeGames = new Map();
 
-// Funkcja do ładowania aktywnych gier z bazy danych
 const loadActiveGamesFromDB = async () => {
   try {
     const result = await pool.query(`
@@ -34,19 +27,18 @@ const loadActiveGamesFromDB = async () => {
       ORDER BY created_at DESC
     `);
     
-    console.log(`Ładowanie ${result.rows.length} aktywnych gier z bazy danych...`);
+    console.log(`Loading ${result.rows.length} active games...`);
     
     for (const row of result.rows) {
-      // Załaduj historię ruchów dla każdej gry
       const moveHistory = await loadMoveHistoryFromDB(row.id);
       
       const gameState = {
         gameId: row.id,
         fen: row.fen,
-        currentTurn: row.fen.split(' ')[1], // Wyciągnij aktualną turę z FEN
+        currentTurn: row.fen.split(' ')[1],
         whitePlayerId: row.white_player_id,
         blackPlayerId: row.black_player_id,
-        moveHistory: moveHistory, // Załadowana historia ruchów
+        moveHistory: moveHistory,
         status: row.status,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -54,13 +46,12 @@ const loadActiveGamesFromDB = async () => {
       activeGames.set(row.id, gameState);
     }
     
-    console.log('Aktywne gry załadowane do pamięci');
+    console.log('Active games loaded');
   } catch (error) {
-    console.error('Błąd ładowania aktywnych gier:', error);
+    console.error('Error loading active games:', error);
   }
 };
 
-// Funkcja do ładowania historii ruchów z bazy danych
 const loadMoveHistoryFromDB = async (gameId) => {
   try {
     const result = await pool.query(`
@@ -80,12 +71,11 @@ const loadMoveHistoryFromDB = async (gameId) => {
       timestamp: row.created_at
     }));
   } catch (error) {
-    console.error('Błąd ładowania historii ruchów:', error);
+    console.error('Error loading move history:', error);
     return [];
   }
 };
 
-// Funkcja do zapisania ruchu w bazie danych
 const saveMoveToDB = async (gameId, from, to, playerId, moveNumber, newFen, promotion = null) => {
   try {
     await pool.query(`
@@ -93,25 +83,23 @@ const saveMoveToDB = async (gameId, from, to, playerId, moveNumber, newFen, prom
       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
     `, [gameId, playerId === 'bot' ? null : playerId, from, to, moveNumber, newFen, promotion]);
     
-    console.log(`Ruch zapisany w DB: gra ${gameId}, ruch ${moveNumber}`);
+    console.log(`Move saved: game ${gameId}, move ${moveNumber}`);
   } catch (error) {
-    console.error('Błąd zapisywania ruchu w bazie:', error);
+    console.error('Error saving move:', error);
     throw error;
   }
 };
 
-// Funkcja do usuwania ruchów z bazy (przy resecie)
 const clearMovesFromDB = async (gameId) => {
   try {
     await pool.query('DELETE FROM moves WHERE game_id = $1', [gameId]);
-    console.log(`Ruchy usunięte z DB dla gry ${gameId}`);
+    console.log(`Moves cleared for game ${gameId}`);
   } catch (error) {
-    console.error('Błąd usuwania ruchów z bazy:', error);
+    console.error('Error clearing moves:', error);
     throw error;
   }
 };
 
-// Funkcja do aktualizacji gry w bazie danych
 const updateGameInDB = async (gameId, gameState) => {
   try {
     await pool.query(`
@@ -120,7 +108,212 @@ const updateGameInDB = async (gameId, gameState) => {
       WHERE id = $3
     `, [gameState.fen, gameState.status, gameId]);
   } catch (error) {
-    console.error('Błąd aktualizacji gry w bazie:', error);
+    console.error('Error updating game:', error);
+  }
+};
+
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`, data ? JSON.stringify(data, null, 2) : '');
+};
+
+const generateRandomBotMove = (fen) => {
+  debugLog('Bot move generation started', { fen });
+  
+  try {
+    const currentPlayer = fen.split(' ')[1];
+    debugLog('Current player', { currentPlayer });
+    
+    if (currentPlayer !== 'b') {
+      debugLog('Not bot turn', { currentPlayer });
+      return null;
+    }
+    
+    const allPossibleMoves = [];
+    const squares = [];
+    
+    for (let file = 'a'; file <= 'h'; file = String.fromCharCode(file.charCodeAt(0) + 1)) {
+      for (let rank = 1; rank <= 8; rank++) {
+        squares.push(file + rank);
+      }
+    }
+    
+    debugLog('Checking squares for legal moves', { totalSquares: squares.length });
+    
+    for (const square of squares) {
+      try {
+        if (typeof getLegalMoves === 'function') {
+          const moves = getLegalMoves(fen, square);
+          if (moves && moves.length > 0) {
+            for (const move of moves) {
+              if (isLegalMove(fen, square, move)) {
+                allPossibleMoves.push({ from: square, to: move });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // Silent continue for empty squares
+      }
+    }
+    
+    debugLog('Legal moves found', { count: allPossibleMoves.length, moves: allPossibleMoves.slice(0, 5) });
+    
+    if (allPossibleMoves.length === 0) {
+      debugLog('No moves found with getLegalMoves, trying basic moves');
+      return generateBasicRandomMove(fen, currentPlayer);
+    }
+    
+    const randomIndex = Math.floor(Math.random() * allPossibleMoves.length);
+    const selectedMove = allPossibleMoves[randomIndex];
+    
+    debugLog('Bot selected move', { move: selectedMove, totalOptions: allPossibleMoves.length });
+    
+    // Double check the selected move is actually legal
+    if (!isLegalMove(fen, selectedMove.from, selectedMove.to)) {
+      debugLog('Selected move not legal, trying basic moves');
+      return generateBasicRandomMove(fen, currentPlayer);
+    }
+    
+    return selectedMove;
+    
+  } catch (error) {
+    debugLog('Error in bot move generation', { error: error.message });
+    return generateBasicRandomMove(fen, fen.split(' ')[1]);
+  }
+};
+
+const generateBasicRandomMove = (fen, currentPlayer) => {
+  debugLog('Generating basic random move', { currentPlayer });
+  
+  const basicMoves = currentPlayer === 'b' ? [
+    { from: 'e7', to: 'e5' }, { from: 'd7', to: 'd5' }, { from: 'g8', to: 'f6' },
+    { from: 'b8', to: 'c6' }, { from: 'f7', to: 'f5' }, { from: 'c7', to: 'c5' },
+    { from: 'a7', to: 'a6' }, { from: 'h7', to: 'h6' }, { from: 'b7', to: 'b6' }
+  ] : [
+    { from: 'e2', to: 'e4' }, { from: 'd2', to: 'd4' }, { from: 'g1', to: 'f3' },
+    { from: 'b1', to: 'c3' }, { from: 'f2', to: 'f4' }, { from: 'c2', to: 'c4' },
+    { from: 'a2', to: 'a3' }, { from: 'h2', to: 'h3' }, { from: 'b2', to: 'b3' }
+  ];
+  
+  const legalBasicMoves = basicMoves.filter(move => {
+    try {
+      return isLegalMove(fen, move.from, move.to);
+    } catch (error) {
+      return false;
+    }
+  });
+  
+  debugLog('Legal basic moves', { count: legalBasicMoves.length, moves: legalBasicMoves });
+  
+  if (legalBasicMoves.length > 0) {
+    const randomMove = legalBasicMoves[Math.floor(Math.random() * legalBasicMoves.length)];
+    debugLog('Selected basic move', { move: randomMove });
+    return randomMove;
+  }
+  
+  debugLog('No legal moves found for bot');
+  return null;
+};
+
+const executeBotMove = async (gameId, io) => {
+  debugLog('Execute bot move started', { gameId });
+  
+  try {
+    const game = activeGames.get(parseInt(gameId));
+    
+    if (!game) {
+      debugLog('Game not found', { gameId });
+      return;
+    }
+    
+    debugLog('Game state before bot move', {
+      gameId,
+      status: game.status,
+      currentTurn: game.currentTurn,
+      blackPlayerId: game.blackPlayerId,
+      fen: game.fen
+    });
+    
+    if (game.status !== 'ongoing') {
+      debugLog('Game not ongoing', { status: game.status });
+      return;
+    }
+    
+    if (game.currentTurn !== 'b') {
+      debugLog('Not black turn', { currentTurn: game.currentTurn });
+      return;
+    }
+    
+    if (game.blackPlayerId !== null && game.blackPlayerId !== 'bot') {
+      debugLog('Black player is not bot', { blackPlayerId: game.blackPlayerId });
+      return;
+    }
+    
+    const botMove = generateRandomBotMove(game.fen);
+    
+    if (!botMove) {
+      debugLog('Bot cannot make move', { gameId });
+      return;
+    }
+    
+    debugLog('Executing bot move', { gameId, move: botMove });
+    
+    const result = await validateMove(gameId, botMove.from, botMove.to, 'bot');
+    
+    debugLog('Bot move validation result', { valid: result.valid, error: result.error });
+    
+    if (result.valid) {
+      debugLog('Bot move successful', {
+        gameId,
+        move: botMove,
+        newFen: result.fen,
+        newTurn: result.currentTurn,
+        status: result.status
+      });
+      
+      const gameState = {
+        fen: result.fen,
+        currentTurn: result.currentTurn,
+        status: result.status,
+        gameId: parseInt(gameId),
+        isCheck: result.isCheck,
+        isCheckmate: result.isCheckmate,
+        isStalemate: result.isStalemate,
+        winner: result.winner,
+        lastMove: { from: botMove.from, to: botMove.to },
+        botMove: true
+      };
+      
+      if (io) {
+        io.to(gameId.toString()).emit('gameState', gameState);
+        debugLog('Game state emitted to clients', { gameId });
+        
+        if (result.status === 'finished' || result.status === 'draw') {
+          io.to(gameId.toString()).emit('gameEnded', {
+            status: result.status,
+            winner: result.winner,
+            reason: result.isCheckmate ? 'checkmate' : 
+                   result.isStalemate ? 'stalemate' : 'other'
+          });
+          debugLog('Game ended event emitted', { gameId, status: result.status });
+        }
+      }
+      
+    } else {
+      debugLog('Bot move failed', {
+        gameId,
+        move: botMove,
+        error: result.error
+      });
+    }
+    
+  } catch (error) {
+    debugLog('Error in executeBotMove', {
+      gameId,
+      error: error.message,
+      stack: error.stack
+    });
   }
 };
 
@@ -129,7 +322,7 @@ const initializeGame = async (whitePlayerId, blackPlayerId) => {
   const status = blackPlayerId === 'bot' ? 'ongoing' : 'waiting';
   
   try {
-    console.log('Inicjalizacja gry:', { whitePlayerId, blackPlayerId, status });
+    debugLog('Initialize game', { whitePlayerId, blackPlayerId, status });
     
     const result = await pool.query(
       `INSERT INTO games (white_player_id, black_player_id, fen, status, created_at, updated_at)
@@ -152,27 +345,21 @@ const initializeGame = async (whitePlayerId, blackPlayerId) => {
     };
     
     activeGames.set(gameId, gameState);
-    console.log(`Gra ${gameId} utworzona i dodana do aktywnych gier`);
+    debugLog('Game created', { gameId, gameState });
     
     return gameState;
   } catch (error) {
-    console.error('Błąd tworzenia gry:', error.stack);
+    debugLog('Error creating game', { error: error.message });
     throw error;
   }
 };
 
-// Funkcja do pobierania gry z pamięci lub bazy danych
 const getGame = async (gameId) => {
-  // Najpierw sprawdź w pamięci
   let game = activeGames.get(parseInt(gameId));
   
   if (!game) {
-    // Jeśli nie ma w pamięci, sprawdź w bazie
     try {
-      const result = await pool.query(
-        'SELECT * FROM games WHERE id = $1',
-        [gameId]
-      );
+      const result = await pool.query('SELECT * FROM games WHERE id = $1', [gameId]);
       
       if (result.rows.length > 0) {
         const row = result.rows[0];
@@ -190,10 +377,10 @@ const getGame = async (gameId) => {
           updatedAt: row.updated_at
         };
         activeGames.set(parseInt(gameId), game);
-        console.log(`Gra ${gameId} załadowana z bazy do pamięci`);
+        debugLog('Game loaded from DB', { gameId });
       }
     } catch (error) {
-      console.error('Błąd pobierania gry z bazy:', error);
+      debugLog('Error getting game from DB', { gameId, error: error.message });
     }
   }
   
@@ -201,74 +388,58 @@ const getGame = async (gameId) => {
 };
 
 const validateMove = async (gameId, from, to, playerId, promotion = null) => {
+  debugLog('Validate move', { gameId, from, to, playerId, promotion });
+  
   const game = await getGame(gameId);
   if (!game) {
-    return { valid: false, error: 'Gra nie znaleziona' };
+    return { valid: false, error: 'Game not found' };
   }
 
-  // Sprawdź czy gra jest w odpowiednim statusie
   if (game.status !== 'ongoing') {
-    return { valid: false, error: 'Gra nie jest aktywna' };
+    return { valid: false, error: 'Game not active' };
   }
 
-  // Sprawdź czy to kolejka gracza
   const currentPlayerColor = game.currentTurn;
   const isWhitePlayer = playerId === game.whitePlayerId || (playerId === 'bot' && game.whitePlayerId === null);
   const isBlackPlayer = playerId === game.blackPlayerId || (playerId === 'bot' && game.blackPlayerId === null);
   
-  // if (currentPlayerColor === 'w' && !isWhitePlayer) {
-  //   return { valid: false, error: 'To nie Twoja kolejka' };
-  // }
-  // if (currentPlayerColor === 'b' && !isBlackPlayer) {
-  //   return { valid: false, error: 'To nie Twoja kolejka' };
-  // }
+  debugLog('Player validation', {
+    currentPlayerColor,
+    isWhitePlayer,
+    isBlackPlayer,
+    playerId,
+    whitePlayerId: game.whitePlayerId,
+    blackPlayerId: game.blackPlayerId
+  });
 
-  // Wykonanie ruchu lub reset
   if (from && to) {
     try {
-      // Walidacja ruchu za pomocą chessLogic
-
       if (!isLegalMove(game.fen, from, to)) {
-        return { valid: false, error: 'Nieprawidłowy ruch' };
+        debugLog('Illegal move detected', { from, to, fen: game.fen });
+        return { valid: false, error: 'Illegal move' };
       }
 
-      // Wykonaj ruch i otrzymaj nowy stan gry
       const moveResult = makeMove(game.fen, from, to, promotion);
       const newFen = moveResult.newFen;
-      
-      // Sprawdź status gry
       const gameStatus = getGameStatus(newFen);
       
       const moveNumber = game.moveHistory.length + 1;
       const moveData = { 
-        from, 
-        to, 
-        playerId, 
-        moveNumber,
-        promotion,
-        fen: newFen,
-        timestamp: new Date() 
+        from, to, playerId, moveNumber, promotion, fen: newFen, timestamp: new Date() 
       };
       
-      // Dodaj ruch do pamięci
       game.moveHistory.push(moveData);
       game.fen = newFen;
-      game.currentTurn = newFen.split(' ')[1]; // Aktualizuj turę z FEN
+      game.currentTurn = newFen.split(' ')[1];
       
-      // Aktualizuj status gry jeśli się zmienił
       if (gameStatus !== 'ongoing') {
         game.status = gameStatus;
       }
       
       try {
-        // Zapisz ruch w bazie danych
         await saveMoveToDB(gameId, from, to, playerId, moveNumber, newFen, promotion);
-        
-        // Aktualizuj grę w bazie danych
         await updateGameInDB(gameId, game);
-        
       } catch (error) {
-        // Jeśli nie udało się zapisać w DB, cofnij zmiany w pamięci
         game.moveHistory.pop();
         game.fen = game.moveHistory.length > 0 ? 
           game.moveHistory[game.moveHistory.length - 1].fen : 
@@ -277,86 +448,58 @@ const validateMove = async (gameId, from, to, playerId, promotion = null) => {
         throw error;
       }
       
+      debugLog('Move validated successfully', {
+        gameId, from, to, newFen: newFen.substring(0, 20) + '...', 
+        currentTurn: game.currentTurn, status: game.status
+      });
+      
       return { 
-        valid: true, 
-        fen: game.fen, 
-        currentTurn: game.currentTurn, 
-        status: game.status,
-        isCheck: moveResult.isCheck,
-        isCheckmate: moveResult.isCheckmate,
-        isStalemate: moveResult.isStalemate,
-        winner: moveResult.winner
+        valid: true, fen: game.fen, currentTurn: game.currentTurn, status: game.status,
+        isCheck: moveResult.isCheck, isCheckmate: moveResult.isCheckmate,
+        isStalemate: moveResult.isStalemate, winner: moveResult.winner
       };
       
     } catch (error) {
-      console.error('Błąd podczas wykonywania ruchu:', error);
-      return { valid: false, error: error.message || 'Błąd wykonania ruchu' };
+      debugLog('Error validating move', { gameId, from, to, error: error.message });
+      return { valid: false, error: error.message || 'Move execution error' };
     }
     
   } else if (!from && !to) {
-    // Reset/undo - prosty reset
     try {
-      // Usuń ruchy z bazy danych
       await clearMovesFromDB(gameId);
       
-      // Reset w pamięci
       game.moveHistory = [];
       game.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       game.currentTurn = 'w';
       game.status = 'ongoing';
       
-      // Aktualizuj grę w bazie danych
       await updateGameInDB(gameId, game);
       
-      return { 
-        valid: true, 
-        fen: game.fen, 
-        currentTurn: game.currentTurn, 
-        status: game.status 
-      };
+      debugLog('Game reset', { gameId });
+      
+      return { valid: true, fen: game.fen, currentTurn: game.currentTurn, status: game.status };
       
     } catch (error) {
-      console.error('Błąd podczas resetowania gry:', error);
-      return { valid: false, error: 'Błąd resetowania gry' };
+      debugLog('Error resetting game', { gameId, error: error.message });
+      return { valid: false, error: 'Reset error' };
     }
   }
   
-  return { valid: false, error: 'Nieprawidłowe parametry ruchu' };
+  return { valid: false, error: 'Invalid move parameters' };
 };
 
-  // Funkcja do konwersji ruchu gracza na ruch bota
-  const convertPlayerMoveToBotMove = (playerMove) => {
-    // Konwertuj pozycję z białej na czarną (odwróć rangi)
-    const convertSquare = (square) => {
-      const file = square[0]; // a-h
-      const rank = square[1]; // 1-8
-      const newRank = String(9 - parseInt(rank)); // odwróć rangę
-      return file + newRank;
-    };
-
-    return {
-      from: convertSquare(playerMove.from),
-      to: convertSquare(playerMove.to),
-      promotion: playerMove.promotion
-    };
-  };
-
-
-// SOCKET HANDLERS - Nowe funkcje do obsługi socketów
 const handleSocketConnection = (io) => {
   return (socket) => {
-    console.log('Nowe połączenie Socket.io:', socket.id);
+    debugLog('New socket connection', { socketId: socket.id });
     
-    // Handler dla dołączania do gry
     socket.on('joinGame', async (gameId) => {
       try {
         socket.join(gameId.toString());
         const game = activeGames.get(parseInt(gameId));
         
         if (game) {
-          console.log(`Użytkownik ${socket.id} dołączył do gry ${gameId}`);
+          debugLog('User joined game', { socketId: socket.id, gameId });
           
-          // Sprawdź stan gry przed wysłaniem - z obsługą błędów
           let isCurrentPlayerInCheck = false;
           let gameStatus = 'ongoing';
           
@@ -369,20 +512,20 @@ const handleSocketConnection = (io) => {
             gameStatus: gameStatus
           });
         } else {
-          socket.emit('error', { message: 'Gra nie znaleziona' });
+          socket.emit('error', { message: 'Game not found' });
         }
       } catch (error) {
-        console.error('Błąd w joinGame socket:', error);
-        socket.emit('error', { message: 'Błąd dołączania do gry' });
+        debugLog('Error in joinGame socket', { error: error.message });
+        socket.emit('error', { message: 'Error joining game' });
       }
     });
 
-    // Handler dla wykonywania ruchów
     socket.on('move', async ({ gameId, from, to, playerId, promotion }) => {
       try {
-        console.log(`Ruch w grze ${gameId}: ${from} -> ${to} przez gracza ${playerId}${promotion ? ` (promocja: ${promotion})` : ''}`);
+        debugLog('Move socket event', { gameId, from, to, playerId, promotion });
         
         const result = await validateMove(gameId, from, to, playerId, promotion);
+        
         if (result.valid) {
           const gameState = {
             fen: result.fen,
@@ -396,20 +539,11 @@ const handleSocketConnection = (io) => {
             lastMove: { from, to }
           };
           
-          // Wyślij aktualizowany stan do wszystkich graczy w pokoju
           io.to(gameId.toString()).emit('gameState', gameState);
+          socket.emit('moveConfirmed', { from, to, promotion, timestamp: new Date().toISOString() });
           
-          // Wyślij potwierdzenie ruchu do gracza, który wykonał ruch
-          socket.emit('moveConfirmed', {
-            from,
-            to,
-            promotion,
-            timestamp: new Date().toISOString()
-          });
+          debugLog('Game state updated and sent', { gameId, currentTurn: result.currentTurn });
           
-          console.log(`Stan gry ${gameId} zaktualizowany i wysłany do graczy`);
-          
-          // Jeśli gra się skończyła, wyślij dodatkowe informacje
           if (result.status === 'finished' || result.status === 'draw') {
             io.to(gameId.toString()).emit('gameEnded', {
               status: result.status,
@@ -417,45 +551,43 @@ const handleSocketConnection = (io) => {
               reason: result.isCheckmate ? 'checkmate' : 
                      result.isStalemate ? 'stalemate' : 'other'
             });
-          }
-          //BOT MOVES
-          if (gameState.status === 'ongoing' && gameState.currentTurn === 'b') {
-            playerId = null;
-            console.log(`Ruch w grze ${gameId}: ${from} -> ${to} przez gracza ${playerId}${promotion ? ` (promocja: ${promotion})` : ''}`);
+          } else {
+            const game = activeGames.get(parseInt(gameId));
+            const isBotGame = game && (game.blackPlayerId === null || game.blackPlayerId === 'bot');
+            const isBotTurn = game && game.currentTurn === 'b';
             
-            const result = await validateMove(gameId, from, to, playerId, promotion);
+            debugLog('Checking bot move conditions', {
+              gameId, isBotGame, isBotTurn, status: game?.status,
+              blackPlayerId: game?.blackPlayerId, currentTurn: game?.currentTurn
+            });
+            
+            if (game && game.status === 'ongoing' && isBotTurn && isBotGame) {
+              debugLog('Scheduling bot move', { gameId });
+              setTimeout(() => {
+                executeBotMove(gameId, io);
+              }, 1500);
+            }
           }
-
           
         } else {
-          socket.emit('moveError', { 
-            message: result.error || 'Nieprawidłowy ruch',
-            from,
-            to
-          });
-          console.log(`Odrzucono ruch w grze ${gameId}: ${result.error}`);
+          socket.emit('moveError', { message: result.error || 'Invalid move', from, to });
+          debugLog('Move rejected', { gameId, from, to, error: result.error });
         }
       } catch (error) {
-        console.error('Błąd w move socket:', error);
-        socket.emit('moveError', { 
-          message: 'Błąd wykonania ruchu',
-          from,
-          to
-        });
+        debugLog('Error in move socket', { error: error.message });
+        socket.emit('moveError', { message: 'Move execution error', from, to });
       }
     });
     
-    // Handler dla pobierania legalnych ruchów
     socket.on('getLegalMoves', ({ gameId, square, playerId }) => {
       try {
         const game = activeGames.get(parseInt(gameId));
         
         if (!game) {
-          socket.emit('legalMovesError', { message: 'Gra nie znaleziona' });
+          socket.emit('legalMovesError', { message: 'Game not found' });
           return;
         }
         
-        // Walidacja pola z fallbackiem
         const validateSquareFormat = (square) => {
           if (typeof isValidSquare === 'function') {
             return isValidSquare(square);
@@ -464,7 +596,7 @@ const handleSocketConnection = (io) => {
         };
         
         if (!validateSquareFormat(square)) {
-          socket.emit('legalMovesError', { message: 'Nieprawidłowy format pola' });
+          socket.emit('legalMovesError', { message: 'Invalid square format' });
           return;
         }
         
@@ -474,31 +606,27 @@ const handleSocketConnection = (io) => {
         }
         
         socket.emit('legalMoves', {
-          square,
-          moves: legalMoves,
-          gameId: parseInt(gameId),
+          square, moves: legalMoves, gameId: parseInt(gameId),
           functionAvailable: typeof getLegalMoves === 'function'
         });
         
       } catch (error) {
-        console.error('Błąd pobierania legalnych ruchów:', error);
-        socket.emit('legalMovesError', { message: 'Błąd serwera' });
+        debugLog('Error getting legal moves', { error: error.message });
+        socket.emit('legalMovesError', { message: 'Server error' });
       }
     });
 
-    // Handler dla rozłączenia
     socket.on('disconnect', () => {
-      console.log('Użytkownik rozłączony:', socket.id);
+      debugLog('User disconnected', { socketId: socket.id });
     });
   };
 };
 
-// Kontrolery API (bez zmian)
 exports.createGame = async (req, res) => {
   const { playerId, gameType } = req.body;
   
   if (!playerId || !gameType) {
-    return res.status(400).json({ error: 'playerId i gameType są wymagane' });
+    return res.status(400).json({ error: 'playerId and gameType required' });
   }
 
   try {
@@ -510,8 +638,8 @@ exports.createGame = async (req, res) => {
       status: gameState.status,
     });
   } catch (error) {
-    console.error('Błąd w createGame:', error);
-    res.status(500).json({ error: 'Nie udało się utworzyć gry' });
+    debugLog('Error in createGame', { error: error.message });
+    res.status(500).json({ error: 'Failed to create game' });
   }
 };
 
@@ -523,11 +651,11 @@ exports.joinGame = async (req, res) => {
     const game = await getGame(gameId);
     
     if (!game) {
-      return res.status(404).json({ error: 'Gra nie znaleziona' });
+      return res.status(404).json({ error: 'Game not found' });
     }
     
     if (game.blackPlayerId && game.blackPlayerId !== 'bot') {
-      return res.status(400).json({ error: 'Gra jest pełna' });
+      return res.status(400).json({ error: 'Game is full' });
     }
     
     if (game.status === 'waiting') {
@@ -537,14 +665,14 @@ exports.joinGame = async (req, res) => {
     }
     
     res.json({ 
-      message: 'Dołączono do gry',
+      message: 'Joined game',
       fen: game.fen,
       currentTurn: game.currentTurn,
       status: game.status
     });
   } catch (error) {
-    console.error('Błąd w joinGame:', error);
-    res.status(500).json({ error: 'Nie udało się dołączyć do gry' });
+    debugLog('Error in joinGame', { error: error.message });
+    res.status(500).json({ error: 'Failed to join game' });
   }
 };
 
@@ -565,22 +693,21 @@ exports.makeMove = async (req, res) => {
         isStalemate: result.isStalemate
       });
     } else {
-      res.status(400).json({ error: result.error || 'Nieprawidłowy ruch' });
+      res.status(400).json({ error: result.error || 'Invalid move' });
     }
   } catch (error) {
-    console.error('Błąd w makeMove:', error);
-    res.status(500).json({ error: 'Nie udało się wykonać ruchu' });
+    debugLog('Error in makeMove', { error: error.message });
+    res.status(500).json({ error: 'Failed to make move' });
   }
 };
 
-// Funkcja do pobierania historii ruchów (dodatkowy endpoint)
 exports.getMoveHistory = async (req, res) => {
   const { gameId } = req.params;
   
   try {
     const game = await getGame(gameId);
     if (!game) {
-      return res.status(404).json({ error: 'Gra nie znaleziona' });
+      return res.status(404).json({ error: 'Game not found' });
     }
     
     res.json({ 
@@ -588,13 +715,13 @@ exports.getMoveHistory = async (req, res) => {
       moveHistory: game.moveHistory 
     });
   } catch (error) {
-    console.error('Błąd w getMoveHistory:', error);
-    res.status(500).json({ error: 'Nie udało się pobrać historii ruchów' });
+    debugLog('Error in getMoveHistory', { error: error.message });
+    res.status(500).json({ error: 'Failed to get move history' });
   }
 };
 
-// Eksport funkcji pomocniczych
 exports.loadActiveGamesFromDB = loadActiveGamesFromDB;
 exports.getActiveGames = () => activeGames;
 exports.validateMove = validateMove;
-exports.handleSocketConnection = handleSocketConnection; // Nowy eksport
+exports.handleSocketConnection = handleSocketConnection;
+exports.executeBotMove = executeBotMove;
