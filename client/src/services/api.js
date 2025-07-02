@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
+const socket = io('http://localhost:3000', { withCredentials: true });
+
 const api = axios.create({
   baseURL: 'http://localhost:3000',
   headers: { 'Content-Type': 'application/json' },
@@ -36,7 +38,7 @@ export const createGame = async (data) => {
 
 export const joinGame = (gameId, callback) => {
   socket.emit('joinGame', gameId);
-  socket.on('gameState', callback);
+  socket.once('gameState', callback);
 };
 
 export const makeMove = (gameId, from, to, playerId, callback, promotion) => {
@@ -44,7 +46,5 @@ export const makeMove = (gameId, from, to, playerId, callback, promotion) => {
   socket.emit('move', { gameId, from, to, playerId, promotion });
   socket.on('gameState', callback);
 };
-
-const socket = io('http://localhost:3000', { withCredentials: true });
 
 export default socket;

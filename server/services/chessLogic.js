@@ -4,7 +4,7 @@
  * Uses FEN notation for board representation and integrates with chessBoard.js for board operations.
  */
 
-const { parseFen, getLegalMoves, applyMove } = require('./chessBoard');
+const { parseFen, getLegalMoves, applyMove, boardToFen } = require('./chessBoard');
 
 /**
  * Validates if a move is legal in the given position
@@ -15,7 +15,6 @@ const { parseFen, getLegalMoves, applyMove } = require('./chessBoard');
  * @throws {Error} If FEN is invalid or coordinates are malformed
  */
 function isLegalMove(fen, from, to) {
-    console.log("FEN received in isLegalMove:", fen, typeof fen);
     if (!fen || typeof fen !== 'string') {
         throw new Error('Invalid FEN: FEN must be a non-empty string');
     }
@@ -25,8 +24,10 @@ function isLegalMove(fen, from, to) {
     }
 
     try {
-        const fenData = parseFen(fen);
-        const legalMoves = getLegalMoves(fenData, from);
+        // console.log("fen - ", fen, typeof(fen));
+        // const fenData = parseFen(fen);
+        // console.log("fenData:\n\n", fenData, "\n\n")
+        const legalMoves = getLegalMoves(fen, from);
         return legalMoves.includes(to);
     } catch (error) {
         throw new Error(`Move validation failed: ${error.message}`);
@@ -59,19 +60,18 @@ function makeMove(fen, from, to, promotion = null) {
     if (!isLegalMove(fen, from, to)) {
         throw new Error(`Illegal move: ${from} to ${to}`);
     }
-
     try {
+        // console.log("fen - ", fen, typeof(fen));
         const fenData = parseFen(fen);
-        const newFenData = applyMove(fenData, from, to, promotion);
-        const newFen = buildFen(newFenData);
-        
+        const newFen = applyMove(fen, from, to, promotion);
+        // const newFen = buildFen(newFenData);
         // Check game status after the move
-        const isCheck = isInCheck(newFenData);
-        const hasLegalMoves = checkHasLegalMoves(newFenData);
+        // console.log("newFen",newFen);
+        const isCheck = isInCheck(newFen);
+        const hasLegalMoves = checkHasLegalMoves(newFen);
         
         const isCheckmate = isCheck && !hasLegalMoves;
         const isStalemate = !isCheck && !hasLegalMoves;
-
         return {
             newFen,
             isCheck,
@@ -109,7 +109,7 @@ function getGameStatus(fen) {
         // Check for checkmate/stalemate
         const isCheck = isInCheck(fenData);
         const hasLegalMoves = checkHasLegalMoves(fenData);
-        
+        // console.log("getGameStatus", fenData, isInCheck, hasLegalMoves)
         if (!hasLegalMoves) {
             return isCheck ? 'checkmate' : 'stalemate';
         }
@@ -162,16 +162,25 @@ function isInCheck(fenData) {
  * @returns {boolean} True if player has legal moves
  */
 function checkHasLegalMoves(fenData) {
+    // console.log("fenData w checkHasLegalMoves: ",fenData,"KONIEC");
+    if (typeof fenData !== 'object'){
+        fen = fenData;
+        fenData = parseFen(fenData);
+    }else{
+        fen = boardToFen(fenData);
+    }
+    console.log("fen:",fen,"fenData:",fenData);
     try {
         // Check all squares for pieces of the current player
         for (let rank = 0; rank < 8; rank++) {
             for (let file = 0; file < 8; file++) {
                 const piece = fenData.board[rank][file];
+                // console.log(`Checking square ${rank},${file} =>`, piece);
                 if (piece && piece !== '-') {
                     const pieceColor = piece === piece.toUpperCase() ? 'w' : 'b';
-                    if (pieceColor === fenData.activeColor) {
+                    if (pieceColor === fenData.turn) {
                         const square = String.fromCharCode(97 + file) + (8 - rank);
-                        const moves = getLegalMoves(fenData, square);
+                        const moves = getLegalMoves(fen, square);
                         if (moves.length > 0) {
                             return true;
                         }
@@ -336,5 +345,7 @@ function buildFen(fenData) {
 module.exports = {
     isLegalMove,
     makeMove,
-    getGameStatus
+    getGameStatus,
+    isValidSquare,
+    isInCheck
 };

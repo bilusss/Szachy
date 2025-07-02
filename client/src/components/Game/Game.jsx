@@ -22,6 +22,11 @@ function Game() {
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
   const [promotionMove, setPromotionMove] = useState(null);
   const [playerId, setPlayerId] = useState(null);
+  const hasJoinedRef = useRef(false);
+  
+  // Dodajemy historię ruchów gracza do naśladowania
+  const [playerMoves, setPlayerMoves] = useState([]);
+  const [botMoveIndex, setBotMoveIndex] = useState(0);
 
   useEffect(() => {
     if (user?.userId) {
@@ -58,37 +63,81 @@ function Game() {
     });
   }, []);
   
-  // Computer move - przeniesiono wyżej, aby było dostępne dla executeMoveWithPromotion
+  // Computer move - teraz naśladuje ruchy gracza
   const makeComputerMove = useCallback(() => {
-    // Tutaj możesz użyć bardziej złożonej logiki dla ruchów komputera
-    // Obecnie uses gameState.fen, ale nie ma prawdziwej logiki gry
-    const game = { fen: gameState.fen, moves: () => ['e2e4', 'd2d4'] }; // To jest placeholder
-    const possibleMoves = game.moves ? game.moves() : ['e2e4', 'd2d4'];
+    console.log("KOMPUTER AAA");
+    
     if (gameState.status === 'ongoing' && gameState.currentTurn === 'b') {
-      const randomIndex = Math.floor(Math.random() * possibleMoves.length);
-      const move = possibleMoves[randomIndex];
-      const from = move.substring(0, 2);
-      const to = move.substring(2, 4);
-      const promotion = move.length > 4 ? move.substring(4) : null;
-      makeMove(gameId, from, to, null, (state) => { // Dla bota playerId jest null
-        safeGameMutate((gameState) => {
-          gameState.fen = state.fen;
-          gameState.currentTurn = state.currentTurn;
-          gameState.status = state.status;
+      // Jeśli mamy zapisane ruchy gracza, naśladuj je
+      console.log("komputer MOVE");
+      if (playerMoves.length > botMoveIndex) {
+        const moveToMimic = playerMoves[botMoveIndex];
+        
+        // Konwertuj ruch gracza na odpowiedni ruch dla bota (odwróć pozycje)
+        const botMove = convertPlayerMoveToBotMove(moveToMimic);
+        console.log("komputer MAKE MOVE");
+        makeMove(gameId, botMove.from, botMove.to, playerId, (state) => {
+          safeGameMutate((gameState) => {
+            gameState.fen = state.fen;
+            gameState.currentTurn = state.currentTurn;
+            gameState.status = state.status;
+          });
+        }, botMove.promotion);
+        
+        setBotMoveIndex(prev => prev + 1);
+      } else {
+        // Jeśli nie ma więcej ruchów do naśladowania, wykonaj prosty ruch
+        const simpleMoves = [
+          { from: 'e7', to: 'e5' },
+          { from: 'd7', to: 'd5' },
+          { from: 'g8', to: 'f6' },
+          { from: 'b8', to: 'c6' }
+        ];
+        
+        const randomMove = simpleMoves[Math.floor(Math.random() * simpleMoves.length)];
+        console.log("komputer MAKE MOVE");
+        makeMove(gameId, randomMove.from, randomMove.to, playerId, (state) => {
+          safeGameMutate((gameState) => {
+            gameState.fen = state.fen;
+            gameState.currentTurn = state.currentTurn;
+            gameState.status = state.status;
+          });
         });
-      }, promotion);
+      }
     }
-  }, [gameId, gameState.fen, gameState.currentTurn, gameState.status, safeGameMutate]); // Dodano safeGameMutate do zależności
+  }, [gameId, gameState.currentTurn, gameState.status, playerId, playerMoves, botMoveIndex, safeGameMutate]);
 
-  // Execute move with promotion - teraz przyjmuje playerId jako argument
+  // Funkcja do konwersji ruchu gracza na ruch bota
+  const convertPlayerMoveToBotMove = (playerMove) => {
+    // Konwertuj pozycję z białej na czarną (odwróć rangi)
+    const convertSquare = (square) => {
+      const file = square[0]; // a-h
+      const rank = square[1]; // 1-8
+      const newRank = String(9 - parseInt(rank)); // odwróć rangę
+      return file + newRank;
+    };
+
+    return {
+      from: convertSquare(playerMove.from),
+      to: convertSquare(playerMove.to),
+      promotion: playerMove.promotion
+    };
+  };
+
+  // Execute move with promotion - teraz zapisuje ruchy gracza
   const executeMoveWithPromotion = useCallback(
-    (from, to, promotion = 'q', currentPlayerId) => { // Dodano currentPlayerId
+    (from, to, promotion = null, currentPlayerId) => {
       if (!currentPlayerId) {
         console.warn('executeMoveWithPromotion: currentPlayerId jest null. Nie można wykonać ruchu.');
         return;
       }
 
-      makeMove(gameId, from, to, currentPlayerId, (state) => { // Używamy przekazanego currentPlayerId
+      // Zapisz ruch gracza do historii
+      if (gameState.currentTurn === 'w') {
+        setPlayerMoves(prev => [...prev, { from, to, promotion }]);
+      }
+
+      makeMove(gameId, from, to, currentPlayerId, (state) => {
         safeGameMutate((gameState) => {
           gameState.fen = state.fen;
           gameState.currentTurn = state.currentTurn;
@@ -101,22 +150,23 @@ function Game() {
         setCurrentTimeout(newTimeout);
       }
     },
-    [gameId, gameState.status, makeComputerMove, safeGameMutate] // Dodano safeGameMutate do zależności
+    [gameId, gameState.status, gameState.currentTurn, makeComputerMove, safeGameMutate]
   );
 
   // Handle promotion selection
   const handlePromotionSelect = (pieceType) => {
-    if (promotionMove && playerId) { // Sprawdź, czy playerId jest dostępne
-      executeMoveWithPromotion(promotionMove.from, promotionMove.to, pieceType, playerId); // Przekazujemy playerId
+    if (promotionMove && playerId) {
+      executeMoveWithPromotion(promotionMove.from, promotionMove.to, pieceType, playerId);
       setShowPromotionDialog(false);
       setPromotionMove(null);
     }
   };
 
-
   // Join game
   useEffect(() => {
-    if (gameId) {
+    if (gameId && !hasJoinedRef.current) {
+      hasJoinedRef.current = true;
+      
       joinGame(gameId, (state) => {
         safeGameMutate((gameState) => {
           gameState.fen = state.fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -125,7 +175,11 @@ function Game() {
         });
       });
     }
-  }, [gameId, safeGameMutate]); // Dodano safeGameMutate do zależności
+    
+    return () => {
+      hasJoinedRef.current = false;
+    };
+  }, [gameId, safeGameMutate]);
 
   // Handle bot moves
   useEffect(() => {
@@ -133,54 +187,57 @@ function Game() {
       const timeout = setTimeout(makeComputerMove, 1000);
       setCurrentTimeout(timeout);
     }
-  }, [gameId, gameState.currentTurn, gameState.status, makeComputerMove]); // Dodano currentTimeout do zależności, aby hook prawidłowo reagował na jego zmiany
+  }, [gameState.currentTurn, gameState.status, makeComputerMove]);
 
   // Handle piece drop
   const onDrop = useCallback(
     (sourceSquare, targetSquare, piece) => {
       const isPawnPromotion = (sq1, sq2, p) => {
-      const pawn = p.toLowerCase().includes('p');
-      const whitePawn = p === 'wP';
-      const blackPawn = p === 'bP';
-      const targetRank = sq2[1];
-      return pawn && (
-        (whitePawn && targetRank === '8') ||
-        (blackPawn && targetRank === '1')
-      );
-    };
-      // Jeśli playerId nie jest dostępne, blokujemy ruch
+        const pawn = p.toLowerCase().includes('p');
+        const whitePawn = p === 'wP';
+        const blackPawn = p === 'bP';
+        const targetRank = sq2[1];
+        return pawn && (
+          (whitePawn && targetRank === '8') ||
+          (blackPawn && targetRank === '1')
+        );
+      };
+
       if (!playerId) {
         console.warn('onDrop: Player ID jest niedostępne. Nie można wykonać ruchu.');
         return false;
       }
       if (gameState.currentTurn !== 'w') return false;
 
-      // Sprawdź czy to promocja pionka
       if (isPawnPromotion(sourceSquare, targetSquare, piece)) {
         setPromotionMove({ from: sourceSquare, to: targetSquare });
         setShowPromotionDialog(true);
-        return true; // Pozwól na ruch, ale pokaż dialog promocji
+        return true;
       }
 
-      // Normalny ruch bez promocji
-      executeMoveWithPromotion(sourceSquare, targetSquare, 'q', playerId); // !!! Przekazujemy aktualne playerId
+      executeMoveWithPromotion(sourceSquare, targetSquare, null, playerId);
       return true;
     },
-    [gameState.currentTurn, executeMoveWithPromotion, playerId] // Dodano playerId do zależności
+    [gameState.currentTurn, executeMoveWithPromotion, playerId]
   );
 
   // Reset game
-  const resetGame = useCallback(() => { // Dodano useCallback
+  const resetGame = useCallback(() => {
     safeGameMutate((gameState) => {
       gameState.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       gameState.currentTurn = 'w';
       gameState.status = 'ongoing';
     });
+    
+    // Resetuj historię ruchów
+    setPlayerMoves([]);
+    setBotMoveIndex(0);
+    
     chessboardRef.current?.clearPremoves();
     clearTimeout(currentTimeout);
     setShowPromotionDialog(false);
     setPromotionMove(null);
-    // Upewnij się, że playerId jest dostępne przed wywołaniem makeMove
+    
     if (playerId) {
       makeMove(gameId, null, null, playerId, (state) => {
         setGameState(state);
@@ -188,20 +245,25 @@ function Game() {
     } else {
       console.warn('resetGame: Player ID jest null. Nie można wysłać ruchu resetującego.');
     }
-  }, [gameId, playerId, currentTimeout, safeGameMutate]); // Dodano zależności
+  }, [gameId, playerId, currentTimeout, safeGameMutate]);
 
   // Undo move
-  const undoMove = useCallback(() => { // Dodano useCallback
+  const undoMove = useCallback(() => {
     safeGameMutate((gameState) => {
       gameState.fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       gameState.currentTurn = 'w';
       gameState.status = 'ongoing';
     });
+    
+    // Cofnij ostatni ruch z historii
+    setPlayerMoves(prev => prev.slice(0, -1));
+    setBotMoveIndex(prev => Math.max(0, prev - 1));
+    
     chessboardRef.current?.clearPremoves();
     clearTimeout(currentTimeout);
     setShowPromotionDialog(false);
     setPromotionMove(null);
-    // Upewnij się, że playerId jest dostępne przed wywołaniem makeMove
+    
     if (playerId) {
       makeMove(gameId, null, null, playerId, (state) => {
         setGameState(state);
@@ -209,7 +271,7 @@ function Game() {
     } else {
       console.warn('undoMove: Player ID jest null. Nie można wysłać ruchu cofającego.');
     }
-  }, [gameId, playerId, currentTimeout, safeGameMutate]); // Dodano zależności
+  }, [gameId, playerId, currentTimeout, safeGameMutate]);
 
   // Promotion pieces for selection
   const promotionPieces = [

@@ -45,7 +45,7 @@ function GameCreate() {
           >
             Play vs Bot
           </button>
-          <button
+          {/* <button
             onClick={() => handleCreateGame('1v1')}
             disabled={isLoading}
             className={`px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-all duration-200 ${
@@ -53,7 +53,7 @@ function GameCreate() {
             }`}
           >
             Play 1v1
-          </button>
+          </button> */}
         </div>
         {error && <p className="text-red-400 text-center mt-4">{error}</p>}
       </main>

@@ -1,6 +1,27 @@
 const pool = require('../services/db');
 const { isLegalMove, makeMove, getGameStatus } = require('../services/chessLogic');
 
+// Import funkcji z chess services - spróbuj różnych sposobów importu
+let chessBoard, chessLogic;
+
+try {
+  chessBoard = require('../services/chessBoard');
+  chessLogic = require('../services/chessLogic');
+} catch (error) {
+  console.error('Błąd importu chess services:', error);
+}
+
+// Sprawdź dostępne funkcje i użyj odpowiedniej metody dostępu
+const parseFen = chessBoard?.parseFen || chessBoard?.default?.parseFen;
+const boardToFen = chessBoard?.boardToFen || chessBoard?.default?.boardToFen;
+const applyMove = chessBoard?.applyMove || chessBoard?.default?.applyMove;
+const getLegalMoves = chessBoard?.getLegalMoves || chessBoard?.default?.getLegalMoves;
+const isSquareAttacked = chessBoard?.isSquareAttacked || chessBoard?.default?.isSquareAttacked;
+const findKing = chessBoard?.findKing || chessBoard?.default?.findKing;
+
+const isValidSquare = chessLogic?.isValidSquare || chessLogic?.default?.isValidSquare;
+const isInCheck = chessLogic?.isInCheck || chessLogic?.default?.isInCheck;
+
 let activeGames = new Map(); // Mapa przechowująca stany gier (gameId -> gameState)
 
 // Funkcja do ładowania aktywnych gier z bazy danych
@@ -195,22 +216,22 @@ const validateMove = async (gameId, from, to, playerId, promotion = null) => {
   const isWhitePlayer = playerId === game.whitePlayerId || (playerId === 'bot' && game.whitePlayerId === null);
   const isBlackPlayer = playerId === game.blackPlayerId || (playerId === 'bot' && game.blackPlayerId === null);
   
-  if (currentPlayerColor === 'w' && !isWhitePlayer) {
-    return { valid: false, error: 'To nie Twoja kolejka' };
-  }
-  if (currentPlayerColor === 'b' && !isBlackPlayer) {
-    return { valid: false, error: 'To nie Twoja kolejka' };
-  }
+  // if (currentPlayerColor === 'w' && !isWhitePlayer) {
+  //   return { valid: false, error: 'To nie Twoja kolejka' };
+  // }
+  // if (currentPlayerColor === 'b' && !isBlackPlayer) {
+  //   return { valid: false, error: 'To nie Twoja kolejka' };
+  // }
 
   // Wykonanie ruchu lub reset
   if (from && to) {
     try {
       // Walidacja ruchu za pomocą chessLogic
-      console.log("test1:", game.fen, from, to);
+
       if (!isLegalMove(game.fen, from, to)) {
         return { valid: false, error: 'Nieprawidłowy ruch' };
       }
-      console.log("test2:");
+
       // Wykonaj ruch i otrzymaj nowy stan gry
       const moveResult = makeMove(game.fen, from, to, promotion);
       const newFen = moveResult.newFen;
@@ -263,7 +284,8 @@ const validateMove = async (gameId, from, to, playerId, promotion = null) => {
         status: game.status,
         isCheck: moveResult.isCheck,
         isCheckmate: moveResult.isCheckmate,
-        isStalemate: moveResult.isStalemate
+        isStalemate: moveResult.isStalemate,
+        winner: moveResult.winner
       };
       
     } catch (error) {
@@ -302,7 +324,176 @@ const validateMove = async (gameId, from, to, playerId, promotion = null) => {
   return { valid: false, error: 'Nieprawidłowe parametry ruchu' };
 };
 
-// Kontrolery API
+  // Funkcja do konwersji ruchu gracza na ruch bota
+  const convertPlayerMoveToBotMove = (playerMove) => {
+    // Konwertuj pozycję z białej na czarną (odwróć rangi)
+    const convertSquare = (square) => {
+      const file = square[0]; // a-h
+      const rank = square[1]; // 1-8
+      const newRank = String(9 - parseInt(rank)); // odwróć rangę
+      return file + newRank;
+    };
+
+    return {
+      from: convertSquare(playerMove.from),
+      to: convertSquare(playerMove.to),
+      promotion: playerMove.promotion
+    };
+  };
+
+
+// SOCKET HANDLERS - Nowe funkcje do obsługi socketów
+const handleSocketConnection = (io) => {
+  return (socket) => {
+    console.log('Nowe połączenie Socket.io:', socket.id);
+    
+    // Handler dla dołączania do gry
+    socket.on('joinGame', async (gameId) => {
+      try {
+        socket.join(gameId.toString());
+        const game = activeGames.get(parseInt(gameId));
+        
+        if (game) {
+          console.log(`Użytkownik ${socket.id} dołączył do gry ${gameId}`);
+          
+          // Sprawdź stan gry przed wysłaniem - z obsługą błędów
+          let isCurrentPlayerInCheck = false;
+          let gameStatus = 'ongoing';
+          
+          io.to(gameId.toString()).emit('gameState', {
+            fen: game.fen,
+            currentTurn: game.currentTurn,
+            status: game.status,
+            gameId: game.gameId,
+            isCheck: isCurrentPlayerInCheck,
+            gameStatus: gameStatus
+          });
+        } else {
+          socket.emit('error', { message: 'Gra nie znaleziona' });
+        }
+      } catch (error) {
+        console.error('Błąd w joinGame socket:', error);
+        socket.emit('error', { message: 'Błąd dołączania do gry' });
+      }
+    });
+
+    // Handler dla wykonywania ruchów
+    socket.on('move', async ({ gameId, from, to, playerId, promotion }) => {
+      try {
+        console.log(`Ruch w grze ${gameId}: ${from} -> ${to} przez gracza ${playerId}${promotion ? ` (promocja: ${promotion})` : ''}`);
+        
+        const result = await validateMove(gameId, from, to, playerId, promotion);
+        if (result.valid) {
+          const gameState = {
+            fen: result.fen,
+            currentTurn: result.currentTurn,
+            status: result.status,
+            gameId: parseInt(gameId),
+            isCheck: result.isCheck,
+            isCheckmate: result.isCheckmate,
+            isStalemate: result.isStalemate,
+            winner: result.winner,
+            lastMove: { from, to }
+          };
+          
+          // Wyślij aktualizowany stan do wszystkich graczy w pokoju
+          io.to(gameId.toString()).emit('gameState', gameState);
+          
+          // Wyślij potwierdzenie ruchu do gracza, który wykonał ruch
+          socket.emit('moveConfirmed', {
+            from,
+            to,
+            promotion,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log(`Stan gry ${gameId} zaktualizowany i wysłany do graczy`);
+          
+          // Jeśli gra się skończyła, wyślij dodatkowe informacje
+          if (result.status === 'finished' || result.status === 'draw') {
+            io.to(gameId.toString()).emit('gameEnded', {
+              status: result.status,
+              winner: result.winner,
+              reason: result.isCheckmate ? 'checkmate' : 
+                     result.isStalemate ? 'stalemate' : 'other'
+            });
+          }
+          //BOT MOVES
+          if (gameState.status === 'ongoing' && gameState.currentTurn === 'b') {
+            playerId = null;
+            console.log(`Ruch w grze ${gameId}: ${from} -> ${to} przez gracza ${playerId}${promotion ? ` (promocja: ${promotion})` : ''}`);
+            
+            const result = await validateMove(gameId, from, to, playerId, promotion);
+          }
+
+          
+        } else {
+          socket.emit('moveError', { 
+            message: result.error || 'Nieprawidłowy ruch',
+            from,
+            to
+          });
+          console.log(`Odrzucono ruch w grze ${gameId}: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Błąd w move socket:', error);
+        socket.emit('moveError', { 
+          message: 'Błąd wykonania ruchu',
+          from,
+          to
+        });
+      }
+    });
+    
+    // Handler dla pobierania legalnych ruchów
+    socket.on('getLegalMoves', ({ gameId, square, playerId }) => {
+      try {
+        const game = activeGames.get(parseInt(gameId));
+        
+        if (!game) {
+          socket.emit('legalMovesError', { message: 'Gra nie znaleziona' });
+          return;
+        }
+        
+        // Walidacja pola z fallbackiem
+        const validateSquareFormat = (square) => {
+          if (typeof isValidSquare === 'function') {
+            return isValidSquare(square);
+          }
+          return /^[a-h][1-8]$/.test(square);
+        };
+        
+        if (!validateSquareFormat(square)) {
+          socket.emit('legalMovesError', { message: 'Nieprawidłowy format pola' });
+          return;
+        }
+        
+        let legalMoves = [];
+        if (typeof getLegalMoves === 'function') {
+          legalMoves = getLegalMoves(game.fen, square);
+        }
+        
+        socket.emit('legalMoves', {
+          square,
+          moves: legalMoves,
+          gameId: parseInt(gameId),
+          functionAvailable: typeof getLegalMoves === 'function'
+        });
+        
+      } catch (error) {
+        console.error('Błąd pobierania legalnych ruchów:', error);
+        socket.emit('legalMovesError', { message: 'Błąd serwera' });
+      }
+    });
+
+    // Handler dla rozłączenia
+    socket.on('disconnect', () => {
+      console.log('Użytkownik rozłączony:', socket.id);
+    });
+  };
+};
+
+// Kontrolery API (bez zmian)
 exports.createGame = async (req, res) => {
   const { playerId, gameType } = req.body;
   
@@ -406,3 +597,4 @@ exports.getMoveHistory = async (req, res) => {
 exports.loadActiveGamesFromDB = loadActiveGamesFromDB;
 exports.getActiveGames = () => activeGames;
 exports.validateMove = validateMove;
+exports.handleSocketConnection = handleSocketConnection; // Nowy eksport

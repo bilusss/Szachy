@@ -11,6 +11,7 @@
  */
 function parseFen(fen) {
   if (!fen || typeof fen !== 'string') {
+    // console.log(fen);
     throw new Error('Invalid FEN: must be a non-empty string');
   }
 
@@ -442,7 +443,6 @@ function getLegalMoves(fen, square) {
   
   const possibleMoves = generatePieceMoves(boardState.board, rank, file, boardState.enPassant, boardState.castling);
   const legalMoves = [];
-  
   // Filter moves that would leave king in check
   for (const move of possibleMoves) {
     const testFen = applyMove(fen, square, move);
@@ -453,7 +453,7 @@ function getLegalMoves(fen, square) {
       legalMoves.push(move);
     }
   }
-  
+  console.log("legalne: \n",possibleMoves,"\n\n");
   return legalMoves;
 }
 
@@ -467,6 +467,7 @@ function getLegalMoves(fen, square) {
  * @throws {Error} If move is invalid
  */
 function applyMove(fen, from, to, promotion = null) {
+  // console.log("fen - ", fen, typeof(fen));
   const boardState = parseFen(fen);
   const [fromRank, fromFile] = squareToIndices(from);
   const [toRank, toFile] = squareToIndices(to);

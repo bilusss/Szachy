@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS games (
   white_player_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   black_player_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- NULL dla bota
   fen TEXT NOT NULL, -- Dodano kolumnę fen
+  current_turn TEXT NOT NULL DEFAULT 'w',
   status TEXT NOT NULL DEFAULT 'waiting', -- waiting, ongoing, finished
   result TEXT, -- checkmate, draw, resigned, timeout
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
