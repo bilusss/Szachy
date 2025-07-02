@@ -65,17 +65,14 @@ function Game() {
   
   // Computer move - teraz naśladuje ruchy gracza
   const makeComputerMove = useCallback(() => {
-    console.log("KOMPUTER AAA");
     
     if (gameState.status === 'ongoing' && gameState.currentTurn === 'b') {
       // Jeśli mamy zapisane ruchy gracza, naśladuj je
-      console.log("komputer MOVE");
       if (playerMoves.length > botMoveIndex) {
         const moveToMimic = playerMoves[botMoveIndex];
         
         // Konwertuj ruch gracza na odpowiedni ruch dla bota (odwróć pozycje)
         const botMove = convertPlayerMoveToBotMove(moveToMimic);
-        console.log("komputer MAKE MOVE");
         makeMove(gameId, botMove.from, botMove.to, playerId, (state) => {
           safeGameMutate((gameState) => {
             gameState.fen = state.fen;
@@ -95,7 +92,6 @@ function Game() {
         ];
         
         const randomMove = simpleMoves[Math.floor(Math.random() * simpleMoves.length)];
-        console.log("komputer MAKE MOVE");
         makeMove(gameId, randomMove.from, randomMove.to, playerId, (state) => {
           safeGameMutate((gameState) => {
             gameState.fen = state.fen;

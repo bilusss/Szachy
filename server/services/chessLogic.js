@@ -169,7 +169,7 @@ function checkHasLegalMoves(fenData) {
     }else{
         fen = boardToFen(fenData);
     }
-    console.log("fen:",fen,"fenData:",fenData);
+    // console.log("fen:",fen,"fenData:",fenData);
     try {
         // Check all squares for pieces of the current player
         for (let rank = 0; rank < 8; rank++) {
