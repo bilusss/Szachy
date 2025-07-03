@@ -1,14 +1,15 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
 import king from '../../assets/king.svg';
 import { useState, useEffect, useCallback, useRef, useContext } from 'react';
-import { joinGame, makeMove } from '../../services/api';
+// import { joinGame, makeMove } from '../../services/api';
 import { AuthContext } from '../../context/AuthContext';
 import socket from '../../services/api';
 
 function Game() {
   const { gameId } = useParams();
-  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading } = useContext(AuthContext);
 
   const [gameState, setGameState] = useState({
     fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
@@ -18,13 +19,26 @@ function Game() {
   const [computerLevel, setComputerLevel] = useState('Easy 🤓');
   const chessboardRef = useRef(null);
   const containerRef = useRef(null);
-  const [boardWidth, setBoardWidth] = useState(calculateBoardWidth());
+  const [boardWidth, setBoardWidth] = useState(300);
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
   const [promotionMove, setPromotionMove] = useState(null);
   const [playerId, setPlayerId] = useState(null);
   const hasJoinedRef = useRef(false);
   const [gameMessage, setGameMessage] = useState('');
   const [isGameEnded, setIsGameEnded] = useState(false);
+  
+  // Nowy stan do wymuszania re-renderowania szachownicy
+  const [boardKey, setBoardKey] = useState(0);
+  const [pendingMove, setPendingMove] = useState(null);
+
+  // Authentication check
+  useEffect(() => {
+    // Sprawdzenie czy użytkownik jest zalogowany
+    if (!loading && !isAuthenticated) {
+      navigate('/login'); // Przekieruj do strony logowania jeśli nie zalogowany
+      return;
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   useEffect(() => {
     if (user?.userId) {
@@ -33,32 +47,65 @@ function Game() {
   }, [user]);
 
   // Calculate chessboard width
-  function calculateBoardWidth() {
-    if (!containerRef.current) return 300;
-    const containerWidth = containerRef.current.getBoundingClientRect().width;
-    const padding = 64;
-    const maxWidth = 600;
-    const minWidth = 280;
-    return Math.min(Math.max(containerWidth - padding, minWidth), maxWidth);
+function calculateBoardWidthWithHeight() {
+  if (!containerRef.current) {
+    return 400;
   }
+  
+  const containerWidth = containerRef.current.getBoundingClientRect().width;
+  const viewportHeight = window.innerHeight;
+  const padding = 32;
+  const maxWidth = 600;
+  const minWidth = 280;
+  
+  // Oblicz dostępną szerokość kontenera
+  const availableWidth = containerWidth - padding;
+  
+  // Oblicz maksymalną szerokość na podstawie wysokości (z większym marginesem)
+  const maxHeightBasedWidth = viewportHeight * 1; // zwiększone z 0.5 na 0.7
+  
+  // Zwróć szerokość ograniczoną przez wszystkie czynniki
+  return Math.min(
+    Math.max(availableWidth, minWidth),
+    maxWidth,
+    maxHeightBasedWidth
+  );
+}
 
-  // Update width on window resize
+  // Update width on window resize and mount
   useEffect(() => {
     const handleResize = () => {
-      setBoardWidth(calculateBoardWidth());
+      setBoardWidth(calculateBoardWidthWithHeight());
     };
-    window.addEventListener('resize', handleResize);
+    
+    // Ustaw szerokość natychmiast
     handleResize();
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // Dodaj listener na resize
+    window.addEventListener('resize', handleResize);
+    
+    // Również reaguj na zmiany orientacji na urządzeniach mobilnych
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleResize, 100);
+    });
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
-  // Safe state mutation
-  const safeGameMutate = useCallback((modify) => {
-    setGameState((prev) => {
-      const update = { ...prev };
-      modify(update);
-      return update;
-    });
+  // Dodatkowo, aktualizuj szerokość gdy kontener się zmieni
+  useEffect(() => {
+    if (containerRef.current) {
+      setBoardWidth(calculateBoardWidthWithHeight());
+    }
+  }, [containerRef.current]);
+
+  // Funkcja do resetowania stanu szachownicy
+  const resetBoardState = useCallback(() => {
+    setBoardKey(prev => prev + 1);
+    setPendingMove(null);
   }, []);
 
   // Socket event listeners setup
@@ -79,6 +126,11 @@ function Game() {
         lastMove: state.lastMove
       });
 
+      // Wyczyść pending move jeśli ruch został zaakceptowany
+      if (pendingMove) {
+        setPendingMove(null);
+      }
+
       // Pokaż komunikat jeśli gra się skończyła
       if (state.status === 'finished' || state.status === 'draw') {
         setIsGameEnded(true);
@@ -98,6 +150,7 @@ function Game() {
     // Handle move confirmations
     const handleMoveConfirmed = (moveData) => {
       console.log('Ruch potwierdzony:', moveData);
+      setPendingMove(null);
     };
 
     // Handle move errors
@@ -105,6 +158,9 @@ function Game() {
       console.error('Błąd ruchu:', error);
       setGameMessage(`Move error: ${error.message}`);
       setTimeout(() => setGameMessage(''), 3000);
+      
+      // Resetuj stan szachownicy po błędzie ruchu
+      resetBoardState();
     };
 
     // Handle game ended
@@ -125,6 +181,9 @@ function Game() {
       console.error('Socket error:', error);
       setGameMessage(`Error: ${error.message}`);
       setTimeout(() => setGameMessage(''), 5000);
+      
+      // Resetuj stan szachownicy po błędzie
+      resetBoardState();
     };
 
     // Register socket listeners
@@ -142,7 +201,7 @@ function Game() {
       socket.off('gameEnded', handleGameEnded);
       socket.off('error', handleError);
     };
-  }, [gameId]);
+  }, [gameId, pendingMove, resetBoardState]);
 
   // Execute move with promotion
   const executeMoveWithPromotion = useCallback(
@@ -155,6 +214,9 @@ function Game() {
       }
 
       console.log(`Wysyłanie ruchu: ${from} -> ${to}`, { gameId, from, to, currentPlayerId, promotion });
+      
+      // Zapisz pending move
+      setPendingMove({ from, to, promotion });
       
       // Wyślij ruch do serwera przez socket
       socket.emit('move', { 
@@ -179,7 +241,7 @@ function Game() {
 
   // Join game
   useEffect(() => {
-    if (gameId && !hasJoinedRef.current) {
+    if (gameId && !hasJoinedRef.current && isAuthenticated) {
       hasJoinedRef.current = true;
       
       console.log(`Dołączanie do gry ${gameId}`);
@@ -189,7 +251,7 @@ function Game() {
     return () => {
       hasJoinedRef.current = false;
     };
-  }, [gameId]);
+  }, [gameId, isAuthenticated]);
 
   // Handle piece drop
   const onDrop = useCallback(
@@ -226,6 +288,13 @@ function Game() {
         return false;
       }
 
+      // Jeśli mamy pending move, nie pozwól na kolejny ruch
+      if (pendingMove) {
+        setGameMessage('Please wait for the current move to be processed.');
+        setTimeout(() => setGameMessage(''), 2000);
+        return false;
+      }
+
       if (isPawnPromotion(sourceSquare, targetSquare, piece)) {
         setPromotionMove({ from: sourceSquare, to: targetSquare });
         setShowPromotionDialog(true);
@@ -235,58 +304,8 @@ function Game() {
       executeMoveWithPromotion(sourceSquare, targetSquare, null, playerId);
       return true;
     },
-    [gameState.currentTurn, gameState.status, executeMoveWithPromotion, playerId]
+    [gameState.currentTurn, gameState.status, executeMoveWithPromotion, playerId, pendingMove]
   );
-
-  // Reset game
-  const resetGame = useCallback(() => {
-    if (!playerId) {
-      console.warn('resetGame: Player ID jest null. Nie można wysłać ruchu resetującego.');
-      setGameMessage('Player not authenticated. Cannot reset game.');
-      setTimeout(() => setGameMessage(''), 3000);
-      return;
-    }
-
-    console.log('Resetowanie gry...');
-    setIsGameEnded(false);
-    setGameMessage('');
-    chessboardRef.current?.clearPremoves();
-    setShowPromotionDialog(false);
-    setPromotionMove(null);
-    
-    // Wyślij reset do serwera (bez from i to)
-    socket.emit('move', { 
-      gameId: parseInt(gameId), 
-      from: null, 
-      to: null, 
-      playerId: playerId 
-    });
-  }, [gameId, playerId]);
-
-  // Undo move (podobnie jak reset)
-  const undoMove = useCallback(() => {
-    if (!playerId) {
-      console.warn('undoMove: Player ID jest null. Nie można wysłać ruchu cofającego.');
-      setGameMessage('Player not authenticated. Cannot undo move.');
-      setTimeout(() => setGameMessage(''), 3000);
-      return;
-    }
-
-    console.log('Cofanie ruchu...');
-    setIsGameEnded(false);
-    setGameMessage('');
-    chessboardRef.current?.clearPremoves();
-    setShowPromotionDialog(false);
-    setPromotionMove(null);
-    
-    // Wyślij undo do serwera (bez from i to)
-    socket.emit('move', { 
-      gameId: parseInt(gameId), 
-      from: null, 
-      to: null, 
-      playerId: playerId 
-    });
-  }, [gameId, playerId]);
 
   // Promotion pieces for selection
   const promotionPieces = [
@@ -296,8 +315,37 @@ function Game() {
     { type: 'n', name: 'Knight', symbol: '♘' }
   ];
 
+  // Don't render anything if not authenticated or still loading
+  if (loading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-cyan-400 mx-auto"></div>
+          <p className="mt-4 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center relative">
+      {/* Floating Game Message - Fixed position at top */}
+      {gameMessage && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-pulse">
+          <div className={`px-6 py-3 rounded-lg shadow-lg border-2 font-semibold text-center max-w-sm ${
+            isGameEnded 
+              ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white border-purple-400' 
+              : gameMessage.includes('check') 
+                ? 'bg-red-600 text-white border-red-400'
+                : gameMessage.includes('error') || gameMessage.includes('Error')
+                  ? 'bg-red-700 text-white border-red-500'
+                  : 'bg-yellow-600 text-black border-yellow-400'
+          }`}>
+            {gameMessage}
+          </div>
+        </div>
+      )}
+
       <header className="w-full bg-gray-800 bg-opacity-90 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-10 shadow-md">
         <div className="flex items-center space-x-3">
           <img src={king} alt="ChessVerse Logo" className="w-8 h-8" />
@@ -309,19 +357,6 @@ function Game() {
       </header>
 
       <main className="p-4 w-full flex flex-col items-center gap-6">
-        {/* Game Message */}
-        {gameMessage && (
-          <div className={`w-full max-w-md p-3 rounded-lg text-center font-semibold ${
-            isGameEnded 
-              ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white' 
-              : gameMessage.includes('check') 
-                ? 'bg-red-600 text-white'
-                : 'bg-yellow-600 text-black'
-          }`}>
-            {gameMessage}
-          </div>
-        )}
-
         {/* Game Status */}
         <div className="w-full max-w-md bg-gray-800 bg-opacity-70 rounded-lg p-3 text-center border border-purple-500/20">
           <p className="text-sm text-gray-300">
@@ -332,26 +367,38 @@ function Game() {
           <p className="text-sm text-gray-300">
             Status: <span className="font-semibold text-white">{gameState.status}</span>
           </p>
+          {pendingMove && (
+            <p className="text-sm text-yellow-400">
+              Processing move: {pendingMove.from} → {pendingMove.to}
+            </p>
+          )}
         </div>
 
-        <div ref={containerRef} className="max-w-[calc(100vw-2rem)] bg-gray-800 bg-opacity-70 rounded-lg shadow-lg p-4 border border-cyan-500/20">
-          <Chessboard
-            position={gameState.fen || 'start'}
-            onPieceDrop={onDrop}
-            boardWidth={boardWidth}
-            customBoardStyle={{
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-            }}
-            customDarkSquareStyle={{ backgroundColor: '#4b7399' }}
-            customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-            arePremovesAllowed={true}
-            isDraggablePiece={({ piece }) => piece[0] === 'w'}
-            ref={chessboardRef}
-            customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 3px rgba(0, 255, 255, 0.5)' }}
-            customDragOverSquareStyle={{ backgroundColor: 'rgba(0, 255, 255, 0.2)' }}
-          />
-
+        {/* Chessboard Container - teraz w pełni responsywny */}
+        <div 
+          ref={containerRef} 
+          className="w-full max-w-2xl px-4 bg-gray-800 bg-opacity-70 rounded-lg shadow-lg py-4 border border-cyan-500/20"
+        >
+          <div className="flex justify-center items-center">
+            <Chessboard
+              key={boardKey} // Kluczowy dodatek - wymusza re-render
+              position={gameState.fen || 'start'}
+              onPieceDrop={onDrop}
+              boardWidth={boardWidth}
+              customBoardStyle={{
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+              }}
+              customDarkSquareStyle={{ backgroundColor: '#4b7399' }}
+              customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
+              arePremovesAllowed={false} // Wyłącz premoves
+              isDraggablePiece={({ piece }) => piece[0] === 'w' && !pendingMove} // Zablokuj przeciąganie podczas pending move
+              ref={chessboardRef}
+              customDropSquareStyle={{ boxShadow: 'inset 0 0 1px 3px rgba(0, 255, 255, 0.5)' }}
+              customDragOverSquareStyle={{ backgroundColor: 'rgba(0, 255, 255, 0.2)' }}
+            />
+          </div>
+            
           <div className="flex flex-wrap justify-center gap-3 mt-4">
             {['Easy 🤓', 'Medium 🧐', 'Hard 😵'].map((level) => (
               <button
@@ -366,20 +413,6 @@ function Game() {
                 {level}
               </button>
             ))}
-            <button
-              onClick={resetGame}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-semibold hover:shadow-lg transition-all duration-200"
-              disabled={!playerId}
-            >
-              New Game
-            </button>
-            <button
-              onClick={undoMove}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-all duration-200"
-              disabled={!playerId}
-            >
-              Undo
-            </button>
           </div>
         </div>
         <div className="w-full max-w-md bg-gray-800 rounded-lg p-4 shadow-lg border border-purple-500/20">
