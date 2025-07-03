@@ -1,8 +1,8 @@
 # Projekt Szachy Wieloosobowe ♟️
 
-
+Załadowany gif:
 ![video gif](docs/video.gif)
-
+(powinien się pojawić oraz jest w folderze docs/)
 
 
 
