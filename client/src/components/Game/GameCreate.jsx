@@ -1,4 +1,4 @@
-import { useState, useContext} from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { createGame } from '../../services/api';
@@ -8,7 +8,15 @@ function GameCreate() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { user } = useContext(AuthContext);
+  const { user, isAuthenticated, loading } = useContext(AuthContext);
+
+  useEffect(() => {
+    // Sprawdzenie czy użytkownik jest zalogowany
+    if (!loading && !isAuthenticated) {
+      navigate('/login'); // Przekieruj do strony logowania jeśli nie zalogowany
+      return;
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   const handleCreateGame = async (gameType) => {
     setIsLoading(true);
@@ -24,6 +32,23 @@ function GameCreate() {
       setIsLoading(false);
     }
   };
+
+  // Pokaż loading podczas sprawdzania autoryzacji
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Nie renderuj komponentu jeśli użytkownik nie jest zalogowany
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
