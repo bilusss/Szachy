@@ -42,7 +42,7 @@ function Register() {
     }
     try {
       const response = await register(username, password);
-      loginContext(response.token); // Automatyczne logowanie po rejestracji
+      // loginContext(response.token); // Automatyczne logowanie po rejestracji
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration Failed');

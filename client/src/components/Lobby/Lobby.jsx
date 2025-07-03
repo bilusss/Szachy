@@ -255,12 +255,12 @@ function Lobby() {
                     >
                       {game.players === 1 ? 'Join Game' : 'Full Game'}
                     </button>
-                    <button
+                    {/* <button
                       onClick={() => navigate(`/game/${game.id}/spectate`)}
                       className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white font-semibold shadow-lg transition-all duration-300 text-sm"
                     >
                       Watch
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               ))}
