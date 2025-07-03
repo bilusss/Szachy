@@ -1,5 +1,12 @@
 # Projekt Szachy Wieloosobowe ♟️
 
+
+![video gif](docs/video.gif)
+
+
+
+
+
 ## Roadmapa 🚀
 
 ### Faza 1: Przygotowanie i konfiguracja 🛠️
