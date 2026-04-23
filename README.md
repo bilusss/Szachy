@@ -1,81 +1,97 @@
-# Projekt Szachy Wieloosobowe ♟️
+# Multiplayer Chess ♟️
 
-Załadowany gif:
-![video gif](docs/video.gif)
-(powinien się pojawić oraz jest w folderze docs/)
+A real-time multiplayer chess application built with React, Node.js, Socket.io, and PostgreSQL. Play chess with friends in your browser — no account required to jump in.
 
+![Demo](docs/video.gif)
 
+## Features
 
+- **Real-time gameplay** — moves sync instantly between players via WebSockets
+- **Full chess rules** — move validation, check, checkmate, and stalemate detection
+- **Game lobby** — create or join rooms to play with others
+- **User accounts** — register and log in; match history stored in PostgreSQL
+- **Live chat** — in-game chat between players
+- **Responsive UI** — built with Tailwind CSS, works on desktop and mobile
 
-## Roadmapa 🚀
+## Tech Stack
 
-### Faza 1: Przygotowanie i konfiguracja 🛠️
-- [✅] Zainstaluj Node.js i PostgreSQL na swoim komputerze ⚙️
-- [✅] Sklonuj repozytorium z GitHub 📂
-- [✅] Utwórz strukturę projektu: `client/` (React) i `server/` (Node.js) 🗂️
-- [✅] Skonfiguruj środowisko deweloperskie w VS Code 💻
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React, Tailwind CSS |
+| Backend | Node.js, Express |
+| Real-time | Socket.io |
+| Database | PostgreSQL |
 
-### Faza 2: Podstawowa konfiguracja back-endu 🌐
-- [✅] Zainstaluj zależności: Express, Socket.io, pg 📦
-- [✅] Przygotuj bazę danych PostgreSQL dla użytkowników 👨‍🎓
-- [ ] Przygotuj bazę danych PostgreSQL dla partii 🗄️
-- [✅] Utwórz serwer Node.js z podstawowym API (rejestracja/logowanie) 🔗
-- [✅] Połącz serwer z PostgreSQL do przechowywania danych użytkowników 🗃️
-- [ ] Wdróż komunikację real-time z Socket.io dla ruchów w grze 📡
+## Getting Started
 
-### Faza 3: Podstawowy front-end z Reactem 🎨
-- [✅] Zainstaluj React i Tailwind CSS w folderze `client/` 🖼️
-- [ ] Stwórz podstawowe komponenty: logowanie, lobby, plansza szachowa 🧩
-- [ ] Połącz Reacta z Socket.io do synchronizacji ruchów ⚡
-- [ ] Zaprojektuj responsywny interfejs z Tailwind CSS 📱
+### Prerequisites
 
-### Faza 4: Logika gry i funkcjonalności 🎮
-- [ ] Zaimplementuj reguły szachów (ruchy figur, szach-mat) ♜
-- [ ] Dodaj system pokoi gry w lobby 🏠
-- [ ] Wdróż czat w czasie rzeczywistym między graczami 💬
-- [ ] Zapisz wyniki partii do bazy danych 📊
+- [Node.js](https://nodejs.org/) v18+
+- [PostgreSQL](https://www.postgresql.org/) v14+
 
-### Faza 5: Testowanie i poprawki 🐞
-- [ ] Przetestuj ruchy i synchronizację między graczami 🔍
-- [ ] Popraw błędy w logice gry i interfejsie ✂️
-- [ ] Upewnij się, że dane w bazie są poprawnie zapisywane ✅
+### Installation
 
-### Faza 6: Deploy na Heroku (opcjonalnie) 🌍
-- [ ] Przygotuj aplikację do wdrożenia (Procfile, zmienne środowiskowe) 📜
-- [ ] Wdróż aplikację na Heroku 🚀
-- [ ] Przetestuj aplikację online i debuguj logi 🖥️
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/bilusss/Szachy.git
+   cd Szachy
+   ```
 
-### Faza 7: Dodatkowe funkcje 🌟
-- [ ] Dodaj rankingi graczy 🏆
-- [ ] Wdróż powiadomienia o nowych meczach 📩
-- [ ] Dodaj możliwość zapraszania znajomych do gry 🤝
+2. **Set up the database**
 
----
+   Create a PostgreSQL database and update the connection config in `server/db.js`:
+   ```js
+   user: 'admin',
+   host: 'localhost',
+   database: 'szachy',
+   password: 'password',
+   port: 5432
+   ```
 
-## Jak zacząć? 🏁
-1. Sklonuj repozytorium: `git clone <url>`
-2. Zainstalować npm, żeby działało z poziomu terminala. (Macos: brew install npm, Windows: najlepiej poradnik)
-3. Zainstaluj zależności w `server/` i `client/` za pomocą `npm install`
-4. Uruchom serwer: `npm start` (w folderze `server/`)
-5. Uruchom front-end: `npm run dev` (w folderze `client/`)
-6. Graj i rozwijaj projekt! 🎉
+3. **Install dependencies**
+   ```bash
+   cd server && npm install
+   cd ../client && npm install
+   ```
 
-### Rozszerzenia VSC
-1. Tailwind CSS IntelliSense
-2. ESLint
-3. Prettier
-4. PostgreSQL
+4. **Run the app**
 
-### Config
+   In one terminal (backend):
+   ```bash
+   cd server && npm start
+   ```
 
-#### PostgreSQL
-```shell
-> user: 'admin'  
-> host: 'localhost'  
-> database: 'szachy'  
-> password: 'password'  
-> port: 5432
+   In another terminal (frontend):
+   ```bash
+   cd client && npm run dev
+   ```
+
+5. Open `http://localhost:5173` in your browser and start playing.
+
+## Recommended VS Code Extensions
+
+- **Tailwind CSS IntelliSense** — autocomplete for Tailwind classes
+- **ESLint** — JavaScript linting
+- **Prettier** — code formatting
+- **PostgreSQL** — database explorer inside VS Code
+
+## Project Structure
+
+```
+Szachy/
+├── client/          # React frontend
+│   ├── src/
+│   │   ├── components/   # Board, Lobby, Login, Chat
+│   │   └── ...
+│   └── package.json
+├── server/          # Node.js backend
+│   ├── index.js     # Express + Socket.io server
+│   ├── db.js        # PostgreSQL connection
+│   └── package.json
+└── docs/
+    └── video.gif
 ```
 
-### Rozszerzenia VSC
-![VSC rozszerzenia](docs/vsc1.png)
+## License
+
+MIT
